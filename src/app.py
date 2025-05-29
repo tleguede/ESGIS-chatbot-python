@@ -83,6 +83,14 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
     chat_router = create_chat_router(chat_controller)
     app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
     
+    # Route racine qui redirige vers la documentation
+    from fastapi.responses import RedirectResponse
+    
+    @app.get("/", include_in_schema=False)
+    async def root():
+        """Redirige vers la documentation de l'API."""
+        return RedirectResponse(url="/docs")
+    
     async def get_webhook_info():
         """
         Récupère les informations sur le webhook actuel.
