@@ -84,12 +84,13 @@ class DynamoAdapter(DatabaseAdapter):
             print(f"Erreur lors de la sauvegarde de la réponse dans DynamoDB: {e}")
             raise
     
-    async def get_conversation(self, chat_id: int) -> List[Dict[str, str]]:
+    async def get_conversation(self, chat_id: int, limit: int = 10) -> List[Dict[str, str]]:
         """
         Récupère l'historique de conversation pour un chat spécifique.
         
         Args:
             chat_id: ID du chat Telegram
+            limit: Nombre maximum de messages à récupérer (par défaut: 10)
             
         Returns:
             Liste de messages avec expéditeur et contenu
@@ -100,44 +101,44 @@ class DynamoAdapter(DatabaseAdapter):
                 ExpressionAttributeValues={
                     ':pk': f'CHAT#{chat_id}',
                     ':sk_prefix': 'MSG#'
-                }
+                },
+                Limit=limit,
+                ScanIndexForward=False,  # Pour obtenir les messages les plus récents en premier
+                ConsistentRead=True
             )
             
-            # Convertir les résultats en format attendu
-            conversation = []
+            # Convertir les éléments DynamoDB en format standard
+            messages = []
             for item in response.get('Items', []):
-                conversation.append({
-                    'from': item.get('From', ''),
-                    'content': item.get('Content', '')
+                messages.append({
+                    'from': 'assistant' if item.get('is_bot', False) else 'user',
+                    'content': item.get('content', '')
                 })
             
-            # Trier par timestamp (SK contient le timestamp)
-            conversation.sort(key=lambda x: x.get('SK', ''))
+            # Inverser pour avoir l'ordre chronologique
+            return messages[::-1]
             
-            return conversation
         except ClientError as e:
-            print(f"Erreur lors de la récupération de la conversation depuis DynamoDB: {e}")
+            print(f"Erreur lors de la récupération de la conversation: {e}")
             return []
     
     async def reset_conversation(self, chat_id: int) -> None:
         """
-        Réinitialise/efface l'historique de conversation pour un chat spécifique.
+        Réinitialise la conversation pour un chat spécifique.
         
         Args:
             chat_id: ID du chat Telegram
         """
         try:
-            # Récupérer tous les éléments à supprimer
+            # Supprimer tous les messages du chat
             response = self.table.query(
-                KeyConditionExpression='PK = :pk AND begins_with(SK, :sk_prefix)',
+                KeyConditionExpression='PK = :pk',
                 ExpressionAttributeValues={
-                    ':pk': f'CHAT#{chat_id}',
-                    ':sk_prefix': 'MSG#'
-                },
-                ProjectionExpression='PK, SK'
+                    ':pk': f'CHAT#{chat_id}'
+                }
             )
             
-            # Supprimer chaque élément
+            # Supprimer chaque message
             with self.table.batch_writer() as batch:
                 for item in response.get('Items', []):
                     batch.delete_item(
@@ -146,6 +147,7 @@ class DynamoAdapter(DatabaseAdapter):
                             'SK': item['SK']
                         }
                     )
+                    
         except ClientError as e:
-            print(f"Erreur lors de la réinitialisation de la conversation dans DynamoDB: {e}")
+            print(f"Erreur lors de la réinitialisation de la conversation: {e}")
             raise

@@ -36,12 +36,13 @@ class DatabaseAdapter(ABC):
         pass
     
     @abstractmethod
-    async def get_conversation(self, chat_id: int) -> List[Dict[str, str]]:
+    async def get_conversation(self, chat_id: int, limit: int = 10) -> List[Dict[str, str]]:
         """
         Récupère l'historique de conversation pour un chat spécifique.
         
         Args:
             chat_id: ID du chat Telegram
+            limit: Nombre maximum de messages à récupérer (par défaut: 10)
             
         Returns:
             Liste de messages avec expéditeur et contenu

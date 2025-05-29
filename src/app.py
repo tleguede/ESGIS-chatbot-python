@@ -278,3 +278,12 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
             await telegram_service.stop()
     
     return app
+
+# Créer et exporter l'application FastAPI
+app = create_app()
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Démarrer le serveur
+    uvicorn.run("src.app:app", host="0.0.0.0", port=8000, reload=True)

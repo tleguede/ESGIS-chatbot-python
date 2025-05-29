@@ -1,11 +1,15 @@
 """
 Contrôleur pour gérer les requêtes de chat via l'API.
 """
+import logging
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
 from ..services.telegram_service import TelegramService
+
+# Configuration du logger
+logger = logging.getLogger(__name__)
 
 
 class MessageRequest(BaseModel):

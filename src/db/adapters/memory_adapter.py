@@ -49,17 +49,20 @@ class MemoryAdapter(DatabaseAdapter):
             'content': response
         })
     
-    async def get_conversation(self, chat_id: int) -> List[Dict[str, str]]:
+    async def get_conversation(self, chat_id: int, limit: int = 10) -> List[Dict[str, str]]:
         """
         Récupère l'historique de conversation pour un chat spécifique.
         
         Args:
             chat_id: ID du chat Telegram
+            limit: Nombre maximum de messages à récupérer (par défaut: 10)
             
         Returns:
             Liste de messages avec expéditeur et contenu
         """
-        return self.conversations.get(chat_id, [])
+        messages = self.conversations.get(chat_id, [])
+        # Retourne les 'limit' derniers messages
+        return messages[-limit:] if limit > 0 else messages
     
     async def reset_conversation(self, chat_id: int) -> None:
         """

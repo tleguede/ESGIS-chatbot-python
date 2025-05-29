@@ -237,20 +237,54 @@ class TelegramService:
             La réponse du bot
         """
         try:
+            logger.info(f"Traitement du message de {username} (chat_id: {chat_id}): {message}")
+            
             # Enregistrer le message de l'utilisateur
-            await self.db_adapter.save_message(chat_id, username, message, is_bot=False)
+            try:
+                await self.db_adapter.save_message(chat_id, username, message)
+                logger.info("Message utilisateur enregistré avec succès dans la base de données")
+            except Exception as db_error:
+                logger.error(f"Erreur lors de l'enregistrement du message: {str(db_error)}")
+                logger.exception(db_error)
             
             # Obtenir le contexte de la conversation
-            conversation = await self.db_adapter.get_conversation(chat_id, limit=5)
+            try:
+                conversation = await self.db_adapter.get_conversation(chat_id, limit=5)
+                logger.info(f"Contexte de la conversation récupéré: {len(conversation)} messages")
+            except Exception as conv_error:
+                logger.error(f"Erreur lors de la récupération de la conversation: {str(conv_error)}")
+                logger.exception(conv_error)
+                conversation = []
             
             # Obtenir une réponse du modèle Mistral
-            response = await self.mistral_client.get_response(conversation)
-            
-            # Enregistrer la réponse du bot
-            await self.db_adapter.save_message(chat_id, "assistant", response, is_bot=True)
-            
-            return response
+            try:
+                logger.info("Appel à l'API Mistral...")
+                # Convertir la conversation en format attendu par Mistral
+                conversation_history = [
+                    {"role": "user" if msg.get("from") == "user" else "assistant", "content": msg.get("content", "")}
+                    for msg in conversation
+                ]
+                # Utiliser le dernier message comme prompt
+                prompt = conversation[-1].get("content", "") if conversation else ""
+                response = await self.mistral_client.get_completion(prompt, conversation_history[:-1])
+                logger.info("Réponse reçue de l'API Mistral")
+                
+                # Enregistrer la réponse du bot
+                try:
+                    await self.db_adapter.save_message(chat_id, "assistant", response)
+                    logger.info("Réponse du bot enregistrée avec succès")
+                except Exception as save_error:
+                    logger.error(f"Erreur lors de l'enregistrement de la réponse: {str(save_error)}")
+                    logger.exception(save_error)
+                
+                return response
+                
+            except Exception as mistral_error:
+                logger.error(f"Erreur lors de l'appel à l'API Mistral: {str(mistral_error)}")
+                logger.exception(mistral_error)
+                return "Désolé, une erreur est survenue lors de la génération de la réponse. Veuillez réessayer plus tard."
             
         except Exception as e:
-            logger.error(f"Erreur lors du traitement du message: {str(e)}")
-            return "Désolé, une erreur est survenue lors du traitement de votre message. Veuillez réessayer plus tard."
+            logger.error(f"Erreur inattendue lors du traitement du message: {str(e)}")
+            logger.exception(e)
+            return "Désolé, une erreur inattendue est survenue. Veuillez réessayer plus tard."

@@ -79,15 +79,10 @@ class MistralClient:
         Formate l'historique de conversation pour l'API Mistral.
         
         Args:
-            conversation_history: Tableau de messages avec expéditeur et contenu
+            conversation_history: Tableau de messages avec rôle et contenu
             
         Returns:
             Messages formatés pour l'API Mistral
         """
-        return [
-            {
-                'role': 'user' if message['from'] == 'user' else 'assistant',
-                'content': message['content']
-            }
-            for message in conversation_history
-        ]
+        # La conversation_history est déjà dans le bon format avec 'role' et 'content'
+        return conversation_history
