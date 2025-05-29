@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: AWS CloudFormation Template for the Application
+
+###############################################################################
+Parameters:
+###############################################################################
+  EnvironmentName:
+    Description: Environment name for the application dev/staging/production
+    Type: String
+    AllowedValues:
+      - tleguede
+      - dev
+      - preprod
+      - prod
+      - tleguede-dev
+      - tleguede-preprod
+      - tleguede-prod
+
+###############################################################################
+Resources:
+###############################################################################
+  DynamoDBTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: !Sub "chatbot-dbtable-${EnvironmentName}"
+      AttributeDefinitions:
+        - AttributeName: "id"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "id"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "chatbot-lambda-${EnvironmentName}"
+      CodeUri: ../
+      Handler: src/main.handler
+      Runtime: python3.12
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
+
+
+Outputs:
+  DynamoDBTableName:
+    Value: !Ref DynamoDBTable
+  ApiUrl:
+    Description: URL of your API
+    Value:
+      Fn::Sub: 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
