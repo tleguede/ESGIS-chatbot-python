@@ -73,7 +73,14 @@ pipeline {
                 script {
                     // Add your deployment commands here
                     echo "Deploying the project..."
-                    sh "make deploy env=${BRANCH_NAME}"
+                    
+                    // Read the .env file to get the values
+                    def envVars = readFile('.env')
+                    def telegramToken = (envVars =~ /TELEGRAM_BOT_TOKEN=["']?([^\r\n"']+)["']?/)[0][1]
+                    def mistralKey = (envVars =~ /MISTRAL_API_KEY=["']?([^\r\n"']+)["']?/)[0][1]
+                    
+                    // Deploy with the environment variables
+                    sh "make deploy env=${BRANCH_NAME} TELEGRAM_BOT_TOKEN='${telegramToken}' MISTRAL_API_KEY='${mistralKey}'"
                 }
             }
         }
