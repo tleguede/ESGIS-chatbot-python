@@ -1,9 +1,9 @@
 """
 Contrôleur pour gérer les requêtes de chat via l'API.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from ..services.telegram_service import TelegramService
 
@@ -61,4 +61,44 @@ class ChatController:
         Returns:
             État de santé du service
         """
-        return {"status": "ok", "message": "Le service de chat est opérationnel"}
+        return {"status": "ok"}
+        
+    async def handle_webhook_update(self, update: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Traite une mise à jour du webhook Telegram.
+        
+        Args:
+            update: Données de mise à jour de Telegram
+            
+        Returns:
+            Réponse de confirmation
+        """
+        try:
+            # Vérifier si c'est un message
+            if 'message' in update:
+                message = update['message']
+                chat_id = message['chat']['id']
+                username = message['from'].get('username', 'inconnu')
+                text = message.get('text', '')
+                
+                if text.startswith('/'):
+                    # Gérer les commandes
+                    if text == '/start':
+                        await self.telegram_service._start_command(update, None)
+                    elif text == '/chat':
+                        await self.telegram_service._chat_command(update, None)
+                    elif text == '/reset':
+                        await self.telegram_service._reset_command(update, None)
+                    elif text == '/help':
+                        await self.telegram_service._help_command(update, None)
+                else:
+                    # Traiter comme un message texte normal
+                    await self.telegram_service.process_message(chat_id, username, text)
+            
+            return {"status": "ok"}
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erreur lors du traitement de la mise à jour: {str(e)}"
+            )

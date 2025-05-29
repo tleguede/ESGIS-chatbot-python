@@ -3,6 +3,8 @@ Application principale pour le chatbot Telegram.
 """
 import asyncio
 import logging
+import os
+import requests
 from fastapi import FastAPI
 from typing import Optional
 
@@ -50,23 +52,62 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
         db_adapter: Adaptateur de base de données à utiliser (optionnel)
         
     Returns:
-        Application FastAPI configurée
+        Instance de l'application FastAPI configurée
     """
-    app = FastAPI(title="ESGIS Telegram Chatbot API")
+    # Valider les variables d'environnement
+    missing_vars = validate_env()
+    if missing_vars:
+        logger.warning(f"Variables d'environnement manquantes : {', '.join(missing_vars)}")
     
-    # Configurer Swagger
-    setup_swagger(app)
-    
-    # Utiliser l'adaptateur fourni ou en obtenir un nouveau
+    # Utiliser l'adaptateur fourni ou en créer un nouveau
     if db_adapter is None:
         db_adapter = get_database_adapter()
     
-    # Créer les services et contrôleurs
+    # Créer l'application FastAPI
+    app = FastAPI(
+        title="Chatbot API",
+        description="API pour le chatbot Telegram",
+        version="1.0.0"
+    )
+    
+    # Configurer la documentation Swagger
+    setup_swagger(app)
+    
+    # Initialiser le service Telegram
     telegram_service = TelegramService(db_adapter)
+    
+    # Initialiser le contrôleur de chat
     chat_controller = ChatController(telegram_service)
     
-    # Ajouter les routes
-    app.include_router(create_chat_router(chat_controller), prefix="/chat")
+    # Créer et enregistrer le routeur de chat
+    chat_router = create_chat_router(chat_controller)
+    app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+    
+    # Configurer le webhook au démarrage si en production
+    @app.on_event("startup")
+    async def startup_event():
+        if config.ENV == "production" or config.IS_LAMBDA_ENVIRONMENT:
+            try:
+                # Obtenir l'URL de l'API depuis les variables d'environnement
+                api_url = os.getenv('API_URL')
+                if not api_url:
+                    logger.warning("API_URL n'est pas défini, impossible de configurer le webhook")
+                    return
+                
+                # Configurer le webhook
+                webhook_url = f"{api_url.rstrip('/')}/api/chat/update"
+                response = requests.post(
+                    f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
+                    json={"url": webhook_url}
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Webhook configuré avec succès vers {webhook_url}")
+                else:
+                    logger.error(f"Échec de la configuration du webhook: {response.text}")
+                    
+            except Exception as e:
+                logger.error(f"Erreur lors de la configuration du webhook: {str(e)}")
     
     # Ajouter un événement de démarrage pour lancer le bot Telegram
     @app.on_event("startup")
