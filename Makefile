@@ -7,11 +7,11 @@ ENV_NAME ?= "tleguede-dev"
 
 # Commande pour démarrer uniquement le bot Telegram
 bot:
-	python -m src.telegram_bot
+	python3 -m src.telegram_bot
 
 # Commande pour démarrer l'API FastAPI et le bot Telegram
 run:
-	python -m src.main
+	python3 -m src.main
 
 # Nettoyer le projet
 clean:
@@ -24,7 +24,7 @@ clean:
 
 # Créer un environnement virtuel
 venv:
-	python -m venv venv
+	python3 -m venv venv
 
 # Installer les dépendances
 install: venv
@@ -51,7 +51,7 @@ deploy:
 
 
 serve:
-	. venv/bin/activate && python -m uvicorn src.main:app --reload
+	. venv/bin/activate && python3 -m uvicorn src.main:app --reload
 
 test-endpoint:
 	@echo "Running endpoint tests..."

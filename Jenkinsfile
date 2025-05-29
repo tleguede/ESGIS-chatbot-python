@@ -17,21 +17,16 @@ pipeline {
             steps {
                 sh "echo Branch name ${BRANCH_NAME}"
                 
-                // Vérifier si Python est installé et l'installer si nécessaire
+                // Vérifier les versions de Python disponibles
                 sh '''
-                    if ! command -v python3 &> /dev/null; then
-                        echo "Python3 n'est pas installé. Installation..."
-                        apt-get update
-                        apt-get install -y python3 python3-pip python3-venv
-                    fi
-                    
-                    # Créer un lien symbolique de python3 vers python si nécessaire
-                    if ! command -v python &> /dev/null; then
-                        ln -sf $(which python3) /usr/local/bin/python
-                    fi
-                    
-                    # Vérifier la version de Python
-                    python --version
+                    echo "Python3 path: $(which python3)"
+                    python3 --version
+                '''
+                
+                // Modifier le Makefile pour utiliser python3 au lieu de python
+                sh '''
+                    sed -i 's/python -m venv venv/python3 -m venv venv/g' Makefile
+                    sed -i 's/python -m src/python3 -m src/g' Makefile
                 '''
                 
                 // Exécuter make venv et make install
