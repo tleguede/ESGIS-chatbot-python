@@ -26,11 +26,34 @@ deploy-local:
 
 deploy:
 	@echo "Deploying to " ${env}
-	# Extract env from the branch name
-
-	sam deploy --resolve-s3 --template-file .aws-sam/build/template.yaml --stack-name multi-stack-${env} \
-         --capabilities CAPABILITY_IAM --region ${AWS_REGION} --parameter-overrides EnvironmentName=${env} --no-fail-on-empty-changeset
-
+	# Optimiser le package Lambda
+	@echo "Optimizing Lambda package..."
+	# Copier requirements-lambda.txt vers requirements.txt pour réduire la taille du package
+	cp requirements-lambda.txt requirements.txt
+	
+	# S'assurer que mangum est installé dans l'environnement virtuel
+	@echo "Installing mangum in virtual environment..."
+	. venv/bin/activate && pip install mangum
+	
+	# Build avec SAM
+	@echo "Building with SAM..."
+	sam build --use-container --template-file infrastructure/template.yaml \
+		--parameter-overrides "EnvironmentName=${env}"
+	
+	# Vérifier que mangum est bien dans le package
+	@echo "Checking if mangum is in the package..."
+	ls -la .aws-sam/build/Function/
+	
+	# Installer manuellement les dépendances dans le package
+	@echo "Installing dependencies in the package..."
+	pip install -r requirements.txt -t .aws-sam/build/Function/
+	
+	# Déployer avec SAM
+	@echo "Deploying with SAM..."
+	sam deploy --stack-name multi-stack-${env} \
+		--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region ${AWS_REGION} \
+		--parameter-overrides "EnvironmentName=${env} TelegramBotToken=${TELEGRAM_BOT_TOKEN} MistralApiKey=${MISTRAL_API_KEY}" \
+		--no-fail-on-empty-changeset
 
 serve:
 	venv/bin/fastapi dev src/main.py
