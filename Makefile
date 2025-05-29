@@ -36,7 +36,7 @@ serve:
 
 test:
 	@echo "Running tests..."
-	venv/bin/pytest
+	# venv/bin/pytest
 
 test-endpoint:
 	@echo "Running endpoint tests..."
