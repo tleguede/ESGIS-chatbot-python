@@ -20,16 +20,36 @@ pipeline {
             }
         }
 
-        // stage('Environment variable injection'){
-        //     steps {
-        //         script{
-        //             withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
-        //                 sh "cat $ENV_FILE >> .env"
-        //             }
-        //         }
-        //     }
-        // }
+        stage('Legacy Environment variable injection'){
+            steps {
+                script{
+                    withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
+                        sh "cat $ENV_FILE >> .env"
+                    }
+                }
+            }
+        }
 
+        stage('Environment variable injection'){
+            steps {
+                script{
+                    // Copier le fichier .env.example vers .env
+                    sh "cp .env.example .env"
+                    
+                    // Injecter les credentials dans le fichier .env
+                    withCredentials([
+                        string(credentialsId: 'telegram-bot-token', variable: 'TELEGRAM_TOKEN'),
+                        string(credentialsId: 'mistral-api-key', variable: 'MISTRAL_KEY')
+                    ]) {
+                        sh '''
+                            sed -i "s|TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=${TELEGRAM_TOKEN}|g" .env
+                            sed -i "s|MISTRAL_API_KEY=.*|MISTRAL_API_KEY=${MISTRAL_KEY}|g" .env
+                            echo "Environment variables set in .env file"
+                        '''
+                    }
+                }
+            }
+        }
 
         stage('Tests Unitaires') {
             steps {

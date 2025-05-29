@@ -16,6 +16,16 @@ Parameters:
       - tleguede-dev
       - tleguede-preprod
       - tleguede-prod
+  
+  TelegramBotToken:
+    Description: Token for the Telegram bot
+    Type: String
+    NoEcho: true
+  
+  MistralApiKey:
+    Description: API key for Mistral AI
+    Type: String
+    NoEcho: true
 
 ###############################################################################
 Resources:
@@ -40,12 +50,24 @@ Resources:
       FunctionName: !Sub "chatbot-lambda-${EnvironmentName}"
       CodeUri: ../
       Handler: src/lambda.lambda_handler
-      Runtime: python3.12
+      Runtime: python3.9
+      Environment:
+        Variables:
+          TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+          MISTRAL_API_KEY: !Ref MistralApiKey
+          DATABASE_TYPE: "dynamodb"
+          DYNAMODB_TABLE: !Ref DynamoDBTable
+          ENV: !Ref EnvironmentName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
       Events:
         Api:
           Type: HttpApi
           Properties:
             ApiId: !Ref Api
+            Path: /{proxy+}
+            Method: ANY
 
   Api:
     Type: AWS::Serverless::HttpApi
