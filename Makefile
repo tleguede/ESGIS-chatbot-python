@@ -44,12 +44,20 @@ deploy-local:
 
 deploy:
 	@echo "Deploying to " ${env}
-	# Extract env from the branch name
-
-	sam deploy --resolve-s3 --template-file infrastructure/template.yaml --stack-name multi-stack-${env} \
-         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region ${AWS_REGION} \
-         --parameter-overrides "EnvironmentName=${env} TelegramBotToken=${TELEGRAM_BOT_TOKEN} MistralApiKey=${MISTRAL_API_KEY}" \
-         --no-fail-on-empty-changeset
+	# Optimiser le package Lambda
+	@echo "Optimizing Lambda package..."
+	# Utiliser le fichier .samignore pour exclure les fichiers inutiles
+	# Utiliser un requirements.txt optimisé pour Lambda
+	sam build --use-container --template-file infrastructure/template.yaml \
+		--parameter-overrides "EnvironmentName=${env}" \
+		--build-properties Parameter=requirements-lambda.txt
+	
+	# Déployer avec SAM
+	@echo "Deploying with SAM..."
+	sam deploy --stack-name multi-stack-${env} \
+		--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region ${AWS_REGION} \
+		--parameter-overrides "EnvironmentName=${env} TelegramBotToken=${TELEGRAM_BOT_TOKEN} MistralApiKey=${MISTRAL_API_KEY}" \
+		--no-fail-on-empty-changeset
 
 
 serve:

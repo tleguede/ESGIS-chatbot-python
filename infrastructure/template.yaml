@@ -55,6 +55,15 @@ Resources:
       Runtime: python3.9
       Timeout: 30
       MemorySize: 256
+      PackageType: Zip
+      Architectures:
+        - x86_64
+      # Exclure les packages de test et autres fichiers inutiles
+      AutoPublishAlias: live
+      AutoPublishCodeSha256: "SAME"
+      # Utiliser une couche Lambda pour les dépendances communes
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:017000801446:layer:AWSLambdaPowertoolsPython:21"
       Environment:
         Variables:
           # Ces variables seront passées via parameter-overrides lors du déploiement

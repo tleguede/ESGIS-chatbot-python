@@ -1,0 +1,42 @@
+# Ignorer les répertoires de développement
+.git
+.github
+.pytest_cache
+__pycache__
+tests/
+node_modules/
+venv/
+.vscode/
+.idea/
+
+# Ignorer les fichiers Python compilés
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ignorer les fichiers d'environnement et de configuration
+.env
+.coverage
+htmlcov/
+
+# Ignorer les répertoires de build
+.aws-sam/
+build/
+
+# Ignorer les packages volumineux non nécessaires en production
+**/tensorflow/
+**/numpy/
+**/pandas/
+**/scipy/
+**/sklearn/
+**/matplotlib/
+**/jupyter/
+**/notebook/
+**/ipython/
+**/pytest/
+
+# Ignorer les fichiers de documentation
+docs/
+*.md
+LICENSE

@@ -1,0 +1,8 @@
+# Dépendances essentielles pour Lambda
+python-telegram-bot==20.6
+python-dotenv==1.0.0
+requests==2.31.0
+fastapi==0.104.1
+boto3==1.28.64
+pydantic==2.4.2
+mangum==0.17.0  # Pour l'intégration Lambda avec FastAPI
