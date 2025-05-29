@@ -185,9 +185,9 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
                     continue
                 
                 # 3. Obtenir l'URL de l'API
-                api_url = os.getenv('API_URL')
+                api_url = config.API_URL
                 if not api_url:
-                    logger.error("❌ API_URL n'est pas défini, impossible de configurer le webhook")
+                    logger.error("❌ API_URL n'est pas défini dans la configuration, impossible de configurer le webhook")
                     return False
                 
                 # 4. Configurer le nouveau webhook

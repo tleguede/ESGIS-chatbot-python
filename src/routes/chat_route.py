@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, Any
 import os
 import requests
+import logging
 
 from ..config.env import config
 from ..controllers.chat_controller import ChatController, MessageRequest, MessageResponse
@@ -55,8 +56,10 @@ def create_chat_router(chat_controller: ChatController) -> APIRouter:
         """
         try:
             # Obtenir l'URL de l'API depuis les variables d'environnement
-            api_url = os.getenv('API_URL')
+            api_url = config.API_URL
             if not api_url:
+                logger = logging.getLogger(__name__)
+                logger.error("API_URL n'est pas configuré dans les variables d'environnement")
                 raise HTTPException(
                     status_code=500,
                     detail="API_URL n'est pas configuré dans les variables d'environnement"

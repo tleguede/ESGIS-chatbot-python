@@ -30,6 +30,9 @@ class Config:
     # MongoDB (optionnel)
     MONGODB_URI = os.getenv('MONGODB_URI', '')
     
+    # Configuration de l'API
+    API_URL = os.getenv('API_URL', 'https://4nsuwkdae8.execute-api.eu-west-3.amazonaws.com')
+    
     # DynamoDB (optionnel)
     AWS_REGION = os.getenv('AWS_REGION', 'eu-west-3')
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
