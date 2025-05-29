@@ -35,11 +35,15 @@ Resources:
     Properties:
       TableName: !Sub "chatbot-dbtable-${EnvironmentName}"
       AttributeDefinitions:
-        - AttributeName: "id"
+        - AttributeName: "PK"
+          AttributeType: "S"
+        - AttributeName: "SK"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "id"
+        - AttributeName: "PK"
           KeyType: "HASH"
+        - AttributeName: "SK"
+          KeyType: "RANGE"
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
