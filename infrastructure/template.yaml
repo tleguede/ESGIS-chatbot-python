@@ -33,7 +33,9 @@ Resources:
   DynamoDBTable:
     Type: "AWS::DynamoDB::Table"
     Properties:
-      TableName: !Sub "chatbot-dbtable-${EnvironmentName}"
+      TableName: !Sub "chatbot-dbtable-v2-${EnvironmentName}"
+      # Ancien nom: chatbot-dbtable-${EnvironmentName}
+      # Supprimer cette ligne de commentaire après la migration
       AttributeDefinitions:
         - AttributeName: "PK"
           AttributeType: "S"
