@@ -83,44 +83,172 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
     chat_router = create_chat_router(chat_controller)
     app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
     
+    async def get_webhook_info():
+        """
+        Récupère les informations sur le webhook actuel.
+        
+        Returns:
+            dict: Informations du webhook ou None en cas d'erreur
+        """
+        try:
+            response = requests.get(
+                f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/getWebhookInfo",
+                timeout=5
+            )
+            if response.status_code == 200:
+                return response.json()
+            logger.warning(f"Échec de la récupération du webhook: {response.text}")
+            return None
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des infos du webhook: {str(e)}")
+            return None
+
+    async def delete_webhook():
+        """
+        Supprime le webhook existant.
+        
+        Returns:
+            bool: True si la suppression a réussi, False sinon
+        """
+        try:
+            # D'abord vérifier s'il y a un webhook actif
+            webhook_info = await get_webhook_info()
+            if not webhook_info or not webhook_info.get('result', {}).get('url'):
+                logger.info("Aucun webhook actif détecté")
+                return True
+                
+            logger.info(f"Suppression du webhook actuel: {webhook_info['result']['url']}")
+            
+            # Supprimer le webhook
+            response = requests.post(
+                f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/deleteWebhook",
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                logger.info("✅ Webhook supprimé avec succès")
+                # Vérifier que la suppression a bien été prise en compte
+                await asyncio.sleep(1)  # Petit délai pour la propagation
+                webhook_info = await get_webhook_info()
+                if not webhook_info or not webhook_info.get('result', {}).get('url'):
+                    return True
+                logger.warning("Le webhook est toujours présent après suppression")
+                return False
+            else:
+                logger.warning(f"Échec de la suppression du webhook: {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Erreur lors de la suppression du webhook: {str(e)}")
+            return False
+
+    async def setup_webhook() -> bool:
+        """
+        Configure le webhook Telegram avec gestion des erreurs et nouvelles tentatives.
+        
+        Returns:
+            bool: True si la configuration a réussi, False sinon
+        """
+        max_retries = 3
+        retry_delay = 2  # secondes
+        
+        for attempt in range(max_retries):
+            try:
+                # Petit délai entre les tentatives
+                if attempt > 0:
+                    logger.info(f"⏳ Nouvelle tentative dans {retry_delay} secondes... (tentative {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                
+                # 1. Vérifier l'état actuel du webhook
+                logger.info("🔍 Vérification de l'état actuel du webhook...")
+                webhook_info = await get_webhook_info()
+                if webhook_info and webhook_info.get('result', {}).get('url'):
+                    logger.info(f"ℹ️ Webhook actuel: {webhook_info['result']['url']}")
+                
+                # 2. Supprimer tout webhook existant
+                logger.info("🗑️  Nettoyage des webhooks existants...")
+                if not await delete_webhook():
+                    logger.warning("⚠️  Impossible de supprimer le webhook existant")
+                    continue
+                
+                # 3. Obtenir l'URL de l'API
+                api_url = os.getenv('API_URL')
+                if not api_url:
+                    logger.error("❌ API_URL n'est pas défini, impossible de configurer le webhook")
+                    return False
+                
+                # 4. Configurer le nouveau webhook
+                webhook_url = f"{api_url.rstrip('/')}/api/chat/update"
+                logger.info(f"🔄 Configuration du nouveau webhook vers: {webhook_url}")
+                
+                response = requests.post(
+                    f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
+                    json={
+                        "url": webhook_url,
+                        "max_connections": 40,  # Nombre maximum de connexions parallèles
+                        "allowed_updates": ["message", "callback_query"]  # Types d'updates à recevoir
+                    },
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    # Vérifier que le webhook a bien été configuré
+                    await asyncio.sleep(1)
+                    webhook_info = await get_webhook_info()
+                    if webhook_info and webhook_info.get('result', {}).get('url') == webhook_url:
+                        logger.info(f"✅ Webhook configuré avec succès vers {webhook_url}")
+                        return True
+                    else:
+                        logger.error("❌ Le webhook n'a pas été correctement configuré")
+                        continue
+                
+                # Gestion des erreurs spécifiques
+                error_msg = response.text
+                logger.error(f"❌ Échec de la configuration du webhook: {error_msg}")
+                
+                # Si c'est une erreur 429 (trop de requêtes), attendre plus longtemps
+                if response.status_code == 429:
+                    retry_after = response.json().get('parameters', {}).get('retry_after', 10)
+                    logger.info(f"⏳ Attente de {retry_after} secondes avant de réessayer...")
+                    await asyncio.sleep(retry_after)
+            
+            except Exception as e:
+                logger.error(f"❌ Erreur lors de la configuration du webhook: {str(e)}")
+                logger.debug(f"Détails de l'erreur: {str(e.__traceback__)}")
+                
+        logger.error(f"❌ Échec de la configuration du webhook après {max_retries} tentatives")
+        return False
+
     @app.on_event("startup")
     async def startup_event():
         """Gère les événements de démarrage de l'application."""
-        # Vérifier que les variables d'environnement requises sont définies
+        logger.info("\n" + "="*60)
+        logger.info("🚀 Démarrage de l'application...")
+        logger.info("="*60)
+        
+        # 1. Vérification des variables d'environnement
         missing_vars = validate_env()
         if missing_vars:
-            logger.error(f"Variables d'environnement manquantes : {', '.join(missing_vars)}")
-            logger.error("Veuillez définir ces variables dans le fichier .env")
+            logger.error(f"❌ Variables d'environnement manquantes : {', '.join(missing_vars)}")
+            logger.error("ℹ️ Veuillez définir ces variables dans le fichier .env")
             return
         
-        # Configurer le webhook si en environnement Lambda
+        # 2. Configuration du webhook si en environnement Lambda
         if config.IS_LAMBDA_ENVIRONMENT:
-            try:
-                # Obtenir l'URL de l'API depuis les variables d'environnement
-                api_url = os.getenv('API_URL')
-                if not api_url:
-                    logger.warning("API_URL n'est pas défini, impossible de configurer le webhook")
-                else:
-                    # Configurer le webhook
-                    webhook_url = f"{api_url.rstrip('/')}/api/chat/update"
-                    response = requests.post(
-                        f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
-                        json={"url": webhook_url}
-                    )
-                    
-                    if response.status_code == 200:
-                        logger.info(f"Webhook configuré avec succès vers {webhook_url}")
-                    else:
-                        logger.error(f"Échec de la configuration du webhook: {response.text}")
-                        
-            except Exception as e:
-                logger.error(f"Erreur lors de la configuration du webhook: {str(e)}")
+            logger.info("🌐 Configuration du webhook Telegram...")
+            if await setup_webhook():
+                logger.info("✅ Configuration du webhook terminée avec succès")
+            else:
+                logger.error("❌ Échec de la configuration du webhook")
         else:
-            # Démarrer le bot Telegram en mode polling (seulement en mode serveur local)
+            # 3. Mode développement : Démarrer le bot en mode polling
+            logger.info("🔍 Mode développement : démarrage en mode polling...")
             asyncio.create_task(telegram_service.start_polling())
-            logger.info(f"Serveur démarré sur le port {config.PORT}")
-            logger.info(f"Documentation API disponible à http://localhost:{config.PORT}")
-            logger.info("Le bot Telegram est actif et écoute les messages")
+            logger.info(f"\n{'='*60}")
+            logger.info(f"🚀 Serveur démarré sur http://localhost:{config.PORT}")
+            logger.info(f"📚 Documentation API : http://localhost:{config.PORT}/docs")
+            logger.info(f"🤖 Bot Telegram en écoute sur le chat")
+            logger.info(f"{'='*60}\n")
     
     # Ajouter un événement d'arrêt pour arrêter le bot Telegram
     @app.on_event("shutdown")
