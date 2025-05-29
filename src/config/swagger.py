@@ -23,6 +23,7 @@ def setup_swagger(app: FastAPI) -> None:
             version="1.0.0",
             description="API pour le chatbot Telegram intégré avec Mistral AI",
             routes=app.routes,
+            openapi_version="3.0.2"
         )
         
         # Personnaliser les tags
