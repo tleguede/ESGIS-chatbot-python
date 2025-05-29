@@ -39,7 +39,7 @@ Resources:
     Properties:
       FunctionName: !Sub "chatbot-lambda-${EnvironmentName}"
       CodeUri: ../
-      Handler: src/main.handler
+      Handler: src/lambda.lambda_handler
       Runtime: python3.12
       Events:
         Api:
