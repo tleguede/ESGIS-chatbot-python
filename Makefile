@@ -48,9 +48,7 @@ deploy:
 
 	sam deploy --resolve-s3 --template-file infrastructure/template.yaml --stack-name multi-stack-${env} \
          --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region ${AWS_REGION} \
-         --parameter-overrides EnvironmentName=${env} \
-         TelegramBotToken="${TELEGRAM_BOT_TOKEN}" \
-         MistralApiKey="${MISTRAL_API_KEY}" \
+         --parameter-overrides "EnvironmentName=${env} TelegramBotToken=${TELEGRAM_BOT_TOKEN} MistralApiKey=${MISTRAL_API_KEY}" \
          --no-fail-on-empty-changeset
 
 
