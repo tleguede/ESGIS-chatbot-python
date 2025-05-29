@@ -16,20 +16,6 @@ pipeline {
         stage('Initialisation') {
             steps {
                 sh "echo Branch name ${BRANCH_NAME}"
-                
-                // Vérifier les versions de Python disponibles
-                sh '''
-                    echo "Python3 path: $(which python3)"
-                    python3 --version
-                '''
-                
-                // Modifier le Makefile pour utiliser python3 au lieu de python
-                sh '''
-                    sed -i 's/python -m venv venv/python3 -m venv venv/g' Makefile
-                    sed -i 's/python -m src/python3 -m src/g' Makefile
-                '''
-                
-                // Exécuter make venv et make install
                 sh "make venv && make install"
             }
         }
@@ -37,22 +23,9 @@ pipeline {
         stage('Environment variable injection'){
             steps {
                 script{
-                    // Copier le fichier .env.example vers .env
-                    sh "cp .env.example .env"
-                    
-                    // Injecter les credentials dans le fichier .env
-                    withCredentials([
-                        string(credentialsId: 'telegram-bot-token', variable: 'TELEGRAM_TOKEN'),
-                        string(credentialsId: 'mistral-api-key', variable: 'MISTRAL_KEY')
-                    ]) {
-                        sh '''
-                            sed -i "s|TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=${TELEGRAM_TOKEN}|g" .env
-                            sed -i "s|MISTRAL_API_KEY=.*|MISTRAL_API_KEY=${MISTRAL_KEY}|g" .env
-                        '''
+                    withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
+                        sh "cat $ENV_FILE >> .env"
                     }
-                    
-                    // Afficher un message de confirmation
-                    sh "echo 'Environment variables injected successfully'"
                 }
             }
         }
