@@ -54,24 +54,37 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
     Returns:
         Instance de l'application FastAPI configurée
     """
-    # Valider les variables d'environnement
-    missing_vars = validate_env()
-    if missing_vars:
-        logger.warning(f"Variables d'environnement manquantes : {', '.join(missing_vars)}")
-    
-    # Utiliser l'adaptateur fourni ou en créer un nouveau
-    if db_adapter is None:
-        db_adapter = get_database_adapter()
-    
-    # Créer l'application FastAPI
+    # Créer l'application FastAPI avec une configuration minimale d'abord
     app = FastAPI(
         title="Chatbot API",
         description="API pour le chatbot Telegram",
         version="1.0.0"
     )
     
-    # Configurer la documentation Swagger
-    setup_swagger(app)
+    # Route racine qui redirige vers la documentation (ajoutée tôt pour éviter les erreurs 500)
+    from fastapi.responses import RedirectResponse
+    
+    @app.get("/", include_in_schema=False)
+    async def root():
+        """Redirige vers la documentation de l'API."""
+        return RedirectResponse(url="/docs")
+    
+    try:
+        # Valider les variables d'environnement
+        missing_vars = validate_env()
+        if missing_vars:
+            logger.warning(f"Variables d'environnement manquantes : {', '.join(missing_vars)}")
+        
+        # Utiliser l'adaptateur fourni ou en créer un nouveau
+        if db_adapter is None:
+            db_adapter = get_database_adapter()
+            
+        # Configurer la documentation Swagger
+        setup_swagger(app)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de l'initialisation de l'application: {str(e)}")
+        # On continue quand même pour que l'application démarre, mais certaines fonctionnalités pourraient ne pas marcher
     
     # Initialiser le service Telegram
     telegram_service = TelegramService(db_adapter)
@@ -82,14 +95,6 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
     # Créer et enregistrer le routeur de chat
     chat_router = create_chat_router(chat_controller)
     app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
-    
-    # Route racine qui redirige vers la documentation
-    from fastapi.responses import RedirectResponse
-    
-    @app.get("/", include_in_schema=False)
-    async def root():
-        """Redirige vers la documentation de l'API."""
-        return RedirectResponse(url="/docs")
     
     async def get_webhook_info():
         """
@@ -234,29 +239,37 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
         logger.info("🚀 Démarrage de l'application...")
         logger.info("="*60)
         
-        # 1. Vérification des variables d'environnement
-        missing_vars = validate_env()
-        if missing_vars:
-            logger.error(f"❌ Variables d'environnement manquantes : {', '.join(missing_vars)}")
-            logger.error("ℹ️ Veuillez définir ces variables dans le fichier .env")
-            return
-        
-        # 2. Configuration du webhook si en environnement Lambda
-        if config.IS_LAMBDA_ENVIRONMENT:
-            logger.info("🌐 Configuration du webhook Telegram...")
-            if await setup_webhook():
-                logger.info("✅ Configuration du webhook terminée avec succès")
+        try:
+            # 1. Vérification des variables d'environnement
+            missing_vars = validate_env()
+            if missing_vars:
+                logger.warning(f"⚠️  Variables d'environnement manquantes : {', '.join(missing_vars)}")
+                logger.warning("ℹ️  Certaines fonctionnalités pourraient ne pas fonctionner correctement")
+            
+            # 2. Configuration du webhook si en environnement Lambda
+            if config.IS_LAMBDA_ENVIRONMENT:
+                logger.info("🌐 Configuration du webhook Telegram...")
+                if await setup_webhook():
+                    logger.info("✅ Configuration du webhook terminée avec succès")
+                else:
+                    logger.error("❌ Échec de la configuration du webhook")
             else:
-                logger.error("❌ Échec de la configuration du webhook")
-        else:
-            # 3. Mode développement : Démarrer le bot en mode polling
-            logger.info("🔍 Mode développement : démarrage en mode polling...")
-            asyncio.create_task(telegram_service.start_polling())
-            logger.info(f"\n{'='*60}")
-            logger.info(f"🚀 Serveur démarré sur http://localhost:{config.PORT}")
-            logger.info(f"📚 Documentation API : http://localhost:{config.PORT}/docs")
-            logger.info(f"🤖 Bot Telegram en écoute sur le chat")
-            logger.info(f"{'='*60}\n")
+                # 3. Mode développement : Démarrer le bot en mode polling
+                logger.info("🔍 Mode développement : démarrage en mode polling...")
+                try:
+                    await telegram_service.start_polling()
+                    logger.info(f"\n{'='*60}")
+                    logger.info(f"🚀 Serveur démarré sur http://localhost:{config.PORT}")
+                    logger.info(f"📚 Documentation API : http://localhost:{config.PORT}/docs")
+                    logger.info(f"🤖 Bot Telegram en écoute sur le chat")
+                    logger.info(f"{'='*60}\n")
+                except Exception as e:
+                    logger.error(f"❌ Erreur lors du démarrage du bot Telegram: {str(e)}")
+                    raise
+                    
+        except Exception as e:
+            logger.error(f"❌ Erreur critique au démarrage: {str(e)}")
+            logger.error("L'application continue de fonctionner mais certaines fonctionnalités pourraient être affectées")
     
     # Ajouter un événement d'arrêt pour arrêter le bot Telegram
     @app.on_event("shutdown")
