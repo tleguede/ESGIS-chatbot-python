@@ -18,12 +18,17 @@ class DynamoAdapter(DatabaseAdapter):
     def __init__(self):
         """Initialise l'adaptateur de base de données DynamoDB."""
         # Configurer le client DynamoDB
-        self.dynamodb = boto3.resource(
-            'dynamodb',
-            region_name=config.AWS_REGION,
-            aws_access_key_id=config.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY
-        )
+        if config.IS_LAMBDA_ENVIRONMENT:
+            # En environnement Lambda, on utilise le rôle IAM attaché
+            self.dynamodb = boto3.resource('dynamodb', region_name=config.AWS_REGION)
+        else:
+            # En local, on utilise les credentials AWS
+            self.dynamodb = boto3.resource(
+                'dynamodb',
+                region_name=config.AWS_REGION,
+                aws_access_key_id=config.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY
+            )
         self.table_name = config.DYNAMO_TABLE
         self.table = self.dynamodb.Table(self.table_name)
     
