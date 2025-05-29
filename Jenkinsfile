@@ -16,6 +16,25 @@ pipeline {
         stage('Initialisation') {
             steps {
                 sh "echo Branch name ${BRANCH_NAME}"
+                
+                // Vérifier si Python est installé et l'installer si nécessaire
+                sh '''
+                    if ! command -v python3 &> /dev/null; then
+                        echo "Python3 n'est pas installé. Installation..."
+                        apt-get update
+                        apt-get install -y python3 python3-pip python3-venv
+                    fi
+                    
+                    # Créer un lien symbolique de python3 vers python si nécessaire
+                    if ! command -v python &> /dev/null; then
+                        ln -sf $(which python3) /usr/local/bin/python
+                    fi
+                    
+                    # Vérifier la version de Python
+                    python --version
+                '''
+                
+                // Exécuter make venv et make install
                 sh "make venv && make install"
             }
         }
