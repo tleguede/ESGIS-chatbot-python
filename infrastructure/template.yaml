@@ -16,6 +16,18 @@ Parameters:
       - tleguede-dev
       - tleguede-preprod
       - tleguede-prod
+      
+  TelegramBotToken:
+    Description: Token for the Telegram bot
+    Type: String
+    Default: ""
+    NoEcho: true
+    
+  MistralApiKey:
+    Description: API key for Mistral AI
+    Type: String
+    Default: ""
+    NoEcho: true
 
 ###############################################################################
 Resources:
@@ -45,8 +57,9 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          TELEGRAM_BOT_TOKEN: "{{resolve:ssm:/chatbot/telegram/token:1}}"
-          MISTRAL_API_KEY: "{{resolve:ssm:/chatbot/mistral/api_key:1}}"
+          # Ces variables seront passées via parameter-overrides lors du déploiement
+          TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+          MISTRAL_API_KEY: !Ref MistralApiKey
           DATABASE_TYPE: "dynamodb"
           DYNAMODB_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
