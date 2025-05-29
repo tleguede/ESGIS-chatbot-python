@@ -39,13 +39,27 @@ Resources:
     Properties:
       FunctionName: !Sub "chatbot-lambda-${EnvironmentName}"
       CodeUri: ../
-      Handler: src/main.handler
-      Runtime: python3.12
+      Handler: src.lambda.lambda_handler
+      Runtime: python3.9
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          TELEGRAM_BOT_TOKEN: "{{resolve:ssm:/chatbot/telegram/token:1}}"
+          MISTRAL_API_KEY: "{{resolve:ssm:/chatbot/mistral/api_key:1}}"
+          DATABASE_TYPE: "dynamodb"
+          DYNAMODB_TABLE: !Ref DynamoDBTable
+          ENV: !Ref EnvironmentName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
       Events:
         Api:
           Type: HttpApi
           Properties:
             ApiId: !Ref Api
+            Path: /{proxy+}
+            Method: ANY
 
   Api:
     Type: AWS::Serverless::HttpApi
