@@ -46,10 +46,10 @@ deploy:
 	@echo "Deploying to " ${env}
 	# Optimiser le package Lambda
 	@echo "Optimizing Lambda package..."
-	# Utiliser le fichier .samignore pour exclure les fichiers inutiles
-	# Utiliser un requirements.txt optimisé pour Lambda
-	# Copier requirements-lambda.txt vers le répertoire source pour SAM
+	# Copier requirements-lambda.txt vers requirements.txt pour réduire la taille du package
 	cp requirements-lambda.txt requirements.txt
+	
+	# Build avec SAM
 	sam build --use-container --template-file infrastructure/template.yaml \
 		--parameter-overrides "EnvironmentName=${env}"
 	
