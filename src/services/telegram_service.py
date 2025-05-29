@@ -200,6 +200,30 @@ class TelegramService:
         """
         logger.error(f"Erreur lors du traitement de la mise à jour {update}: {context.error}")
     
+    async def process_callback(self, callback_query: Dict[str, Any]) -> None:
+        """
+        Traite un callback de bouton inline.
+        
+        Args:
+            callback_query: Données du callback
+        """
+        try:
+            from telegram import Update
+            from telegram.ext import CallbackContext, ContextTypes
+            
+            # Créer un objet Update factice pour le callback
+            update = Update(0)
+            update.callback_query = callback_query
+            
+            # Créer un contexte factice
+            context = CallbackContext(update=update)
+            
+            # Traiter le callback
+            await self._handle_callback(update, context)
+            
+        except Exception as e:
+            logger.error(f"Erreur lors du traitement du callback: {str(e)}")
+    
     async def process_message(self, chat_id: int, username: str, message: str) -> str:
         """
         Traite un message de l'API.
@@ -212,16 +236,21 @@ class TelegramService:
         Returns:
             La réponse du bot
         """
-        # Sauvegarder le message de l'utilisateur
-        await self.db_adapter.save_message(chat_id, username, message)
-        
-        # Récupérer l'historique de conversation
-        conversation_history = await self.db_adapter.get_conversation(chat_id)
-        
-        # Obtenir une réponse de Mistral AI
-        response = await self.mistral_client.get_completion(message, conversation_history)
-        
-        # Sauvegarder la réponse du bot
-        await self.db_adapter.save_response(chat_id, response)
-        
-        return response
+        try:
+            # Enregistrer le message de l'utilisateur
+            await self.db_adapter.save_message(chat_id, username, message, is_bot=False)
+            
+            # Obtenir le contexte de la conversation
+            conversation = await self.db_adapter.get_conversation(chat_id, limit=5)
+            
+            # Obtenir une réponse du modèle Mistral
+            response = await self.mistral_client.get_response(conversation)
+            
+            # Enregistrer la réponse du bot
+            await self.db_adapter.save_message(chat_id, "assistant", response, is_bot=True)
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Erreur lors du traitement du message: {str(e)}")
+            return "Désolé, une erreur est survenue lors du traitement de votre message. Veuillez réessayer plus tard."

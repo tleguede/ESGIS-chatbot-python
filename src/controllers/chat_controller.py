@@ -95,9 +95,22 @@ class ChatController:
                     # Traiter comme un message texte normal
                     await self.telegram_service.process_message(chat_id, username, text)
             
+            # Gérer les callbacks des boutons inline
+            elif 'callback_query' in update:
+                callback_query = update['callback_query']
+                message = callback_query['message']
+                chat_id = message['chat']['id']
+                username = callback_query['from'].get('username', 'inconnu')
+                data = callback_query.get('data', '')
+                
+                # Traiter le callback
+                await self.telegram_service.process_callback(callback_query)
+            
             return {"status": "ok"}
             
         except Exception as e:
+            logger.error(f"Erreur lors du traitement de la mise à jour: {str(e)}")
+            logger.error(f"Détails de l'erreur: {str(e.__traceback__)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Erreur lors du traitement de la mise à jour: {str(e)}"

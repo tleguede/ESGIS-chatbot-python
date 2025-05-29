@@ -83,35 +83,9 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
     chat_router = create_chat_router(chat_controller)
     app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
     
-    # Configurer le webhook au démarrage si en production
     @app.on_event("startup")
     async def startup_event():
-        if config.ENV == "production" or config.IS_LAMBDA_ENVIRONMENT:
-            try:
-                # Obtenir l'URL de l'API depuis les variables d'environnement
-                api_url = os.getenv('API_URL')
-                if not api_url:
-                    logger.warning("API_URL n'est pas défini, impossible de configurer le webhook")
-                    return
-                
-                # Configurer le webhook
-                webhook_url = f"{api_url.rstrip('/')}/api/chat/update"
-                response = requests.post(
-                    f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
-                    json={"url": webhook_url}
-                )
-                
-                if response.status_code == 200:
-                    logger.info(f"Webhook configuré avec succès vers {webhook_url}")
-                else:
-                    logger.error(f"Échec de la configuration du webhook: {response.text}")
-                    
-            except Exception as e:
-                logger.error(f"Erreur lors de la configuration du webhook: {str(e)}")
-    
-    # Ajouter un événement de démarrage pour lancer le bot Telegram
-    @app.on_event("startup")
-    async def startup_event():
+        """Gère les événements de démarrage de l'application."""
         # Vérifier que les variables d'environnement requises sont définies
         missing_vars = validate_env()
         if missing_vars:
@@ -119,8 +93,30 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
             logger.error("Veuillez définir ces variables dans le fichier .env")
             return
         
-        # Démarrer le bot Telegram en mode polling (seulement en mode serveur)
-        if not config.IS_LAMBDA_ENVIRONMENT:
+        # Configurer le webhook si en environnement Lambda
+        if config.IS_LAMBDA_ENVIRONMENT:
+            try:
+                # Obtenir l'URL de l'API depuis les variables d'environnement
+                api_url = os.getenv('API_URL')
+                if not api_url:
+                    logger.warning("API_URL n'est pas défini, impossible de configurer le webhook")
+                else:
+                    # Configurer le webhook
+                    webhook_url = f"{api_url.rstrip('/')}/api/chat/update"
+                    response = requests.post(
+                        f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
+                        json={"url": webhook_url}
+                    )
+                    
+                    if response.status_code == 200:
+                        logger.info(f"Webhook configuré avec succès vers {webhook_url}")
+                    else:
+                        logger.error(f"Échec de la configuration du webhook: {response.text}")
+                        
+            except Exception as e:
+                logger.error(f"Erreur lors de la configuration du webhook: {str(e)}")
+        else:
+            # Démarrer le bot Telegram en mode polling (seulement en mode serveur local)
             asyncio.create_task(telegram_service.start_polling())
             logger.info(f"Serveur démarré sur le port {config.PORT}")
             logger.info(f"Documentation API disponible à http://localhost:{config.PORT}")

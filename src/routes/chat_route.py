@@ -1,7 +1,7 @@
 """
 Routes pour l'API de chat.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, Any
 import os
 import requests
