@@ -54,13 +54,13 @@ def create_chat_router(chat_controller: ChatController) -> APIRouter:
             Statut de la configuration du webhook
         """
         try:
-            # Obtenir l'URL de l'API depuis les variables d'environnement
-            api_url = os.getenv('API_URL')
-            if not api_url:
+            # Utiliser l'URL de l'API depuis la configuration centralisée
+            if not config.API_URL:
                 raise HTTPException(
                     status_code=500,
-                    detail="API_URL n'est pas configuré dans les variables d'environnement"
+                    detail="API_URL n'est pas configuré dans la configuration de l'application"
                 )
+            api_url = config.API_URL
             
             # Construire l'URL du webhook
             webhook_url = f"{api_url.rstrip('/')}/api/chat/update"

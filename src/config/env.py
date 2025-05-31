@@ -38,6 +38,12 @@ class Config:
     AWS_PROFILE = os.getenv('AWS_PROFILE', 'esgis_profile')
     ENV_NAME = os.getenv('ENV_NAME', 'tleguede-dev')
     IS_LAMBDA_ENVIRONMENT = bool(os.getenv('AWS_LAMBDA_FUNCTION_NAME', ''))
+    
+    # Configuration de l'API
+    API_URL = os.getenv('API_URL', '')
+    # URL de base pour les webhooks, avec une valeur par défaut basée sur l'environnement
+    if not API_URL:
+        API_URL = 'https://api.votredomaine.com' if ENV == 'production' else 'http://localhost:3000'
 
 # Créer une instance de la configuration
 config = Config()
