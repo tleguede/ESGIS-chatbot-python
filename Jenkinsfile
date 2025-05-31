@@ -78,9 +78,10 @@ pipeline {
                     def envVars = readFile('.env')
                     def telegramToken = (envVars =~ /TELEGRAM_BOT_TOKEN=["']?([^\r\n"']+)["']?/)[0][1]
                     def mistralKey = (envVars =~ /MISTRAL_API_KEY=["']?([^\r\n"']+)["']?/)[0][1]
+                    def api_url = (envVars =~ /API_URL=["']?([^\r\n"']+)["']?/)[0][1]
                     
                     // Deploy with the environment variables
-                    sh "make deploy env=${BRANCH_NAME} TELEGRAM_BOT_TOKEN='${telegramToken}' MISTRAL_API_KEY='${mistralKey}'"
+                    sh "make deploy env=${BRANCH_NAME} TELEGRAM_BOT_TOKEN='${telegramToken}' MISTRAL_API_KEY='${mistralKey}' API_URL='${api_url}'"
                 }
             }
         }
