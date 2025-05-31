@@ -1,27 +1,49 @@
 version: '3.8'
 
 services:
-  chatbot:
+  lambda-local:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: esgis-chatbot
+    container_name: esgis-chatbot-lambda
     ports:
       - "3000:3000"
     environment:
+      # Variables d'environnement Lambda
+      - AWS_LAMBDA_FUNCTION_NAME=esgis-chatbot
+      - AWS_LAMBDA_FUNCTION_VERSION=1.0.0
+      - AWS_REGION=eu-west-3
+      - AWS_EXECUTION_ENV=AWS_Lambda_python3.11
+      - AWS_SAM_LOCAL=true
+      
+      # Variables d'environnement de l'application
       - PORT=3000
       - NODE_ENV=production
-      - IS_LAMBDA_ENVIRONMENT=false
+      - IS_LAMBDA_ENVIRONMENT=true
       - USE_MEMORY_ADAPTER=true
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - API_URL=${API_URL}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - ENV_NAME=${ENV_NAME:-dev}
+      - AWS_REGION_NAME=${AWS_REGION_NAME:-eu-west-3}
+      - DYNAMO_TABLE=${DYNAMO_TABLE}
     volumes:
-      - ./data:/app/data
+      - ./:/var/task
+      - ~/.aws:/root/.aws:ro  # Montage des credentials AWS (en lecture seule)
     restart: unless-stopped
     networks:
-      - chatbot-network
+      - lambda-network
+
+  # Service optionnel pour simuler DynamoDB local
+  dynamodb-local:
+    image: amazon/dynamodb-local
+    container_name: esgis-dynamodb-local
+    ports:
+      - "8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb"
+    networks:
+      - lambda-network
 
 networks:
-  chatbot-network:
+  lambda-network:
     driver: bridge

@@ -50,6 +50,44 @@ Pour tester l'application localement:
 uvicorn src.main:app --reload
 ```
 
+## Utilisation avec GitHub Codespaces
+
+Ce projet est configuré pour fonctionner avec GitHub Codespaces, ce qui vous permet de développer et tester l'application dans un environnement cloud sans installation locale.
+
+### Démarrer avec Codespaces
+
+1. Sur GitHub, naviguez vers le dépôt du projet
+2. Cliquez sur le bouton vert "Code"
+3. Sélectionnez l'onglet "Codespaces"
+4. Cliquez sur "Create codespace on main"
+
+### Fonctionnalités disponibles dans Codespaces
+
+- Environnement de développement préconfiguré avec toutes les dépendances
+- Simulation d'AWS Lambda pour tester le déploiement serverless
+- DynamoDB local pour les tests de persistance
+- Extensions VS Code préinstallées pour le développement Python et AWS
+
+### Commandes utiles dans Codespaces
+
+```bash
+# Démarrer l'application en mode développement
+python -m src.app
+
+# Tester l'API avec SAM local
+sam local start-api --port 3000
+
+# Construire l'application pour déploiement
+sam build
+
+# Déployer sur AWS (nécessite configuration AWS)
+sam deploy --guided
+```
+
+### Variables d'environnement
+
+Dans Codespaces, vous devez configurer vos variables d'environnement dans les secrets du dépôt GitHub ou les ajouter manuellement au fichier `.env` après le démarrage de votre espace de code.
+
 ### Déploiement AWS
 
 Pour déployer sur AWS Lambda:

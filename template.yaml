@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  ESGIS Chatbot Telegram
+  Application serverless pour le chatbot Telegram ESGIS
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.11
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        IS_LAMBDA_ENVIRONMENT: true
+        USE_MEMORY_ADAPTER: false
+        DYNAMO_TABLE: !Ref DynamoDBTable
+
+Resources:
+  # Fonction Lambda pour l'API
+  ChatbotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src.lambda_handler.handler
+      Description: Fonction principale du chatbot Telegram
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /api/{proxy+}
+            Method: ANY
+        WebhookEvent:
+          Type: Api
+          Properties:
+            Path: /api/chat/update
+            Method: POST
+
+  # Table DynamoDB pour stocker les conversations
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-conversations"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: chat_id
+          AttributeType: S
+        - AttributeName: message_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: chat_id
+          KeyType: HASH
+        - AttributeName: message_id
+          KeyType: RANGE
+
+Outputs:
+  ChatbotApi:
+    Description: "URL de l'API Gateway"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  
+  ChatbotFunction:
+    Description: "ARN de la fonction Lambda"
+    Value: !GetAtt ChatbotFunction.Arn
+  
+  DynamoDBTable:
+    Description: "Nom de la table DynamoDB"
+    Value: !Ref DynamoDBTable

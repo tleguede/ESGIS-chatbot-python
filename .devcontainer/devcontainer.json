@@ -1,0 +1,45 @@
+{
+  "name": "ESGIS Chatbot Python",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "lambda-local",
+  "workspaceFolder": "/var/task",
+  "forwardPorts": [3000, 8000],
+  "portsAttributes": {
+    "3000": {
+      "label": "FastAPI",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "DynamoDB Local",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-docker",
+        "amazonwebservices.aws-toolkit-vscode",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/var/lang/bin/python3",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
+  },
+  "postCreateCommand": "pip install -r requirements.txt && echo 'export PATH=$PATH:/var/task/node_modules/.bin' >> ~/.bashrc"
+}
