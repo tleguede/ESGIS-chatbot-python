@@ -8,10 +8,10 @@ RUN yum update -y && \
 WORKDIR /var/task
 
 # Copier les fichiers de dépendances
-COPY requirements.txt .
+COPY requirements.txt requirements-lambda.txt ./
 
-# Installer les dépendances
-RUN pip install --no-cache-dir -r requirements.txt
+# Installer les dépendances (utiliser requirements-lambda.txt pour l'environnement Lambda)
+RUN pip install --no-cache-dir -r requirements-lambda.txt
 
 # Copier le reste du code source
 COPY . .
