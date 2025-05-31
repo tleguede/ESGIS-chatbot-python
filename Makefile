@@ -1,5 +1,7 @@
+.PHONY: bot clean venv install build deploy-local deploy serve test test-endpoint webhook-status webhook-delete webhook-setup webhook-setup-win
+
 bot:
-	python3 -m src.telegram_bot
+	python -m src.telegram_bot
 
 # by default, we settle down in this region
 AWS_REGION ?= eu-west-3
