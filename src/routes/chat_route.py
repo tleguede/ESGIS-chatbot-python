@@ -68,10 +68,19 @@ def create_chat_router(chat_controller: ChatController) -> APIRouter:
             # Construire l'URL du webhook
             webhook_url = f"{api_url.rstrip('/')}/api/chat/update"
             
-            # Configurer le webhook avec Telegram
+            # Supprimer d'abord tout webhook existant
+            delete_response = requests.post(
+                f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/deleteWebhook"
+            )
+            
+            # Vérifier si la suppression a réussi
+            if delete_response.status_code != 200:
+                logger.warning(f"Échec de la suppression du webhook existant: {delete_response.text}")
+            
+            # Configurer le nouveau webhook
             response = requests.post(
                 f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
-                json={"url": webhook_url}
+                json={"url": webhook_url, "drop_pending_updates": True}
             )
             
             if response.status_code != 200:

@@ -35,15 +35,19 @@ function Show-Help {
     Write-Host "  .\make.ps1 build          - Build with SAM"
     Write-Host "  .\make.ps1 deploy-local   - Start local API"
     Write-Host "  .\make.ps1 deploy         - Deploy to AWS"
-    Write-Host "  .\make.ps1 serve          - Run FastAPI development server"
-    Write-Host "  .\make.ps1 test           - Run tests"
-    Write-Host "  .\make.ps1 test-endpoint  - Test API endpoint"
-    Write-Host "  .\make.ps1 help           - Show this help"
+    Write-Host "  .\make.ps1 serve           - Run FastAPI development server"
+    Write-Host "  .\make.ps1 test            - Run tests"
+    Write-Host "  .\make.ps1 test-endpoint   - Test API endpoint"
+    Write-Host "  .\make.ps1 webhook-status  - Show webhook status"
+    Write-Host "  .\make.ps1 webhook-delete  - Delete existing webhook"
+    Write-Host "  .\make.ps1 webhook-setup   - Setup webhook (use -webhook_url to specify URL)"
+    Write-Host "  .\make.ps1 help            - Show this help"
     Write-Host ""
     Write-Host "Environment variables:" -ForegroundColor Yellow
     Write-Host "  env           - Environment name (default: dev)"
     Write-Host "  AWS_REGION    - AWS region (default: eu-west-3)"
     Write-Host "  AWS_PROFILE   - AWS profile (default: esgis_profile)"
+    Write-Host "  webhook_url   - Webhook URL (for webhook-setup command)"
 }
 
 function Invoke-Bot {
@@ -191,6 +195,34 @@ function Test-Endpoint {
     }
 }
 
+function Invoke-WebhookStatus {
+    Write-Host "Checking webhook status..." -ForegroundColor Green
+    python -m src.utils.webhook_cli status
+}
+
+function Invoke-WebhookDelete {
+    Write-Host "Deleting webhook..." -ForegroundColor Green
+    python -m src.utils.webhook_cli delete --force
+}
+
+function Invoke-WebhookSetup {
+    param (
+        [string]$url = $null
+    )
+    
+    if (-not $url) {
+        $url = Read-Host "Enter webhook base URL (e.g., https://your-api-url.com)"
+    }
+    
+    if (-not $url) {
+        Write-Host "Error: Webhook URL is required" -ForegroundColor Red
+        exit 1
+    }
+    
+    Write-Host "Setting up webhook to $url..." -ForegroundColor Green
+    python -m src.utils.webhook_cli setup --url $url
+}
+
 # Main script execution
 switch ($target.ToLower()) {
     "bot"            { Invoke-Bot }
@@ -203,6 +235,9 @@ switch ($target.ToLower()) {
     "serve"          { Start-Server }
     "test"           { Invoke-Tests }
     "test-endpoint"  { Test-Endpoint }
+    "webhook-status" { Invoke-WebhookStatus }
+    "webhook-delete" { Invoke-WebhookDelete }
+    "webhook-setup"  { Invoke-WebhookSetup -url $webhook_url }
     "help"           { Show-Help }
     default          { Write-Host "Unknown target: $target" -ForegroundColor Red; Show-Help }
 }
