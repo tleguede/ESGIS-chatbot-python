@@ -65,12 +65,37 @@ class TelegramService:
         logger.info("Le bot Telegram a démarré en mode polling")
     
     async def stop(self):
-        """Arrête le bot."""
-        if self.app.updater:
-            await self.app.updater.stop()
-        await self.app.stop()
-        await self.app.shutdown()
-        logger.info("Le bot Telegram a été arrêté")
+        """Arrête le bot avec gestion des erreurs."""
+        try:
+            # Arrêter l'updater avec un timeout pour éviter les blocages
+            if self.app.updater:
+                try:
+                    # Utiliser asyncio.wait_for pour imposer un timeout
+                    import asyncio
+                    await asyncio.wait_for(self.app.updater.stop(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Timeout lors de l'arrêt de l'updater, continuation forcée")
+                except asyncio.CancelledError:
+                    logger.warning("Tâche d'arrêt de l'updater annulée, continuation forcée")
+                except Exception as e:
+                    logger.warning(f"Erreur lors de l'arrêt de l'updater: {str(e)}")
+            
+            # Arrêter l'application
+            try:
+                await asyncio.wait_for(self.app.stop(), timeout=2.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception) as e:
+                logger.warning(f"Erreur lors de l'arrêt de l'application: {str(e)}")
+            
+            # Arrêter l'application complètement
+            try:
+                await asyncio.wait_for(self.app.shutdown(), timeout=2.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception) as e:
+                logger.warning(f"Erreur lors de l'arrêt complet de l'application: {str(e)}")
+                
+            logger.info("Le bot Telegram a été arrêté")
+            
+        except Exception as e:
+            logger.error(f"Erreur critique lors de l'arrêt du bot: {str(e)}")
     
     async def _start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -223,6 +248,32 @@ class TelegramService:
             
         except Exception as e:
             logger.error(f"Erreur lors du traitement du callback: {str(e)}")
+    
+    async def send_message(self, chat_id: int, text: str) -> None:
+        """
+        Envoie un message via l'API Telegram directement.
+        
+        Args:
+            chat_id: ID du chat Telegram
+            text: Texte du message à envoyer
+        """
+        try:
+            import requests
+            
+            url = f"https://api.telegram.org/bot{self.token}/sendMessage"
+            data = {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML"
+            }
+            
+            response = requests.post(url, json=data)
+            
+            if response.status_code != 200:
+                logger.error(f"Erreur lors de l'envoi du message: {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Erreur lors de l'envoi du message: {str(e)}")
     
     async def process_message(self, chat_id: int, username: str, message: str) -> str:
         """

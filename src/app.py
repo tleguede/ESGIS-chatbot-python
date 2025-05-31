@@ -104,14 +104,20 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
             dict: Informations du webhook ou None en cas d'erreur
         """
         try:
-            response = requests.get(
-                f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/getWebhookInfo",
-                timeout=5
-            )
-            if response.status_code == 200:
-                return response.json()
-            logger.warning(f"Échec de la récupération du webhook: {response.text}")
-            return None
+            # Utiliser une bibliothèque HTTP asynchrone
+            import aiohttp
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/getWebhookInfo",
+                    timeout=5
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    
+                    text = await response.text()
+                    logger.warning(f"Échec de la récupération du webhook: {text}")
+                    return None
         except Exception as e:
             logger.error(f"Erreur lors de la récupération des infos du webhook: {str(e)}")
             return None
@@ -132,24 +138,27 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
                 
             logger.info(f"Suppression du webhook actuel: {webhook_info['result']['url']}")
             
-            # Supprimer le webhook
-            response = requests.post(
-                f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/deleteWebhook",
-                timeout=5
-            )
+            # Supprimer le webhook avec aiohttp
+            import aiohttp
             
-            if response.status_code == 200:
-                logger.info("✅ Webhook supprimé avec succès")
-                # Vérifier que la suppression a bien été prise en compte
-                await asyncio.sleep(1)  # Petit délai pour la propagation
-                webhook_info = await get_webhook_info()
-                if not webhook_info or not webhook_info.get('result', {}).get('url'):
-                    return True
-                logger.warning("Le webhook est toujours présent après suppression")
-                return False
-            else:
-                logger.warning(f"Échec de la suppression du webhook: {response.text}")
-                return False
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/deleteWebhook",
+                    timeout=5
+                ) as response:
+                    if response.status == 200:
+                        logger.info("✅ Webhook supprimé avec succès")
+                        # Vérifier que la suppression a bien été prise en compte
+                        await asyncio.sleep(1)  # Petit délai pour la propagation
+                        webhook_info = await get_webhook_info()
+                        if not webhook_info or not webhook_info.get('result', {}).get('url'):
+                            return True
+                        logger.warning("Le webhook est toujours présent après suppression")
+                        return False
+                    else:
+                        text = await response.text()
+                        logger.warning(f"Échec de la suppression du webhook: {text}")
+                        return False
                 
         except Exception as e:
             logger.error(f"Erreur lors de la suppression du webhook: {str(e)}")
@@ -194,36 +203,39 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
                 webhook_url = f"{api_url.rstrip('/')}/api/chat/update"
                 logger.info(f"🔄 Configuration du nouveau webhook vers: {webhook_url}")
                 
-                response = requests.post(
-                    f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
-                    json={
-                        "url": webhook_url,
-                        "max_connections": 40,  # Nombre maximum de connexions parallèles
-                        "allowed_updates": ["message", "callback_query"]  # Types d'updates à recevoir
-                    },
-                    timeout=10
-                )
+                import aiohttp
                 
-                if response.status_code == 200:
-                    # Vérifier que le webhook a bien été configuré
-                    await asyncio.sleep(1)
-                    webhook_info = await get_webhook_info()
-                    if webhook_info and webhook_info.get('result', {}).get('url') == webhook_url:
-                        logger.info(f"✅ Webhook configuré avec succès vers {webhook_url}")
-                        return True
-                    else:
-                        logger.error("❌ Le webhook n'a pas été correctement configuré")
-                        continue
-                
-                # Gestion des erreurs spécifiques
-                error_msg = response.text
-                logger.error(f"❌ Échec de la configuration du webhook: {error_msg}")
-                
-                # Si c'est une erreur 429 (trop de requêtes), attendre plus longtemps
-                if response.status_code == 429:
-                    retry_after = response.json().get('parameters', {}).get('retry_after', 10)
-                    logger.info(f"⏳ Attente de {retry_after} secondes avant de réessayer...")
-                    await asyncio.sleep(retry_after)
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
+                        json={
+                            "url": webhook_url,
+                            "max_connections": 40,  # Nombre maximum de connexions parallèles
+                            "allowed_updates": ["message", "callback_query"]  # Types d'updates à recevoir
+                        },
+                        timeout=10
+                    ) as response:
+                        if response.status == 200:
+                            # Vérifier que le webhook a bien été configuré
+                            await asyncio.sleep(1)
+                            webhook_info = await get_webhook_info()
+                            if webhook_info and webhook_info.get('result', {}).get('url') == webhook_url:
+                                logger.info(f"✅ Webhook configuré avec succès vers {webhook_url}")
+                                return True
+                            else:
+                                logger.error("❌ Le webhook n'a pas été correctement configuré")
+                                continue
+                        
+                        # Gestion des erreurs spécifiques
+                        error_msg = await response.text()
+                        logger.error(f"❌ Échec de la configuration du webhook: {error_msg}")
+                        
+                        # Si c'est une erreur 429 (trop de requêtes), attendre plus longtemps
+                        if response.status == 429:
+                            response_json = await response.json()
+                            retry_after = response_json.get('parameters', {}).get('retry_after', 10)
+                            logger.info(f"⏳ Attente de {retry_after} secondes avant de réessayer...")
+                            await asyncio.sleep(retry_after)
             
             except Exception as e:
                 logger.error(f"❌ Erreur lors de la configuration du webhook: {str(e)}")
@@ -254,8 +266,25 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
                 else:
                     logger.error("❌ Échec de la configuration du webhook")
             else:
-                # 3. Mode développement : Démarrer le bot en mode polling
-                logger.info("🔍 Mode développement : démarrage en mode polling...")
+                # 3. Mode développement : D'abord supprimer tout webhook existant, puis démarrer en mode polling
+                logger.info("🔍 Mode développement : vérification des webhooks existants...")
+                
+                # Vérifier s'il y a un webhook actif
+                webhook_info = await get_webhook_info()
+                if webhook_info and webhook_info.get('result', {}).get('url'):
+                    logger.warning(f"Un webhook est actif sur {webhook_info['result']['url']}")
+                    logger.info("Suppression du webhook existant avant de démarrer en mode polling...")
+                    
+                    # Supprimer le webhook existant
+                    if await delete_webhook():
+                        logger.info("Webhook supprimé avec succès, démarrage en mode polling...")
+                    else:
+                        logger.error("Impossible de supprimer le webhook existant. Le mode polling ne fonctionnera pas correctement.")
+                        logger.info("Vous pouvez supprimer manuellement le webhook avec la commande: python -m src.utils.webhook_cli delete")
+                        # Continuer quand même, l'erreur sera gérée par python-telegram-bot
+                
+                # Démarrer en mode polling
+                logger.info("🔍 Démarrage du bot en mode polling...")
                 try:
                     await telegram_service.start_polling()
                     logger.info(f"\n{'='*60}")

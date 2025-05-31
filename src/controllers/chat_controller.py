@@ -86,18 +86,38 @@ class ChatController:
                 text = message.get('text', '')
                 
                 if text.startswith('/'):
-                    # Gérer les commandes
+                    # Gérer les commandes - traitement direct sans passer par les handlers
                     if text == '/start':
-                        await self.telegram_service._start_command(update, None)
+                        welcome_message = 'Bonjour ! Je suis votre assistant IA alimenté par Mistral AI. Comment puis-je vous aider aujourd\'hui?\n\n' \
+                                      'Utilisez /chat pour démarrer une conversation avec moi\n' \
+                                      'Utilisez /reset pour effacer notre historique de conversation\n' \
+                                      'Utilisez /help pour voir toutes les commandes disponibles'
+                        
+                        # Envoyer directement un message via l'API Telegram
+                        await self.telegram_service.send_message(chat_id, welcome_message)
+                    
                     elif text == '/chat':
-                        await self.telegram_service._chat_command(update, None)
+                        # Activer le mode chat pour cet utilisateur
+                        self.telegram_service.chat_mode[chat_id] = True
+                        await self.telegram_service.send_message(chat_id, 'Mode chat activé ! Vous pouvez maintenant me parler directement. Que voulez-vous discuter ?')
+                    
                     elif text == '/reset':
-                        await self.telegram_service._reset_command(update, None)
+                        # Réinitialiser la conversation
+                        await self.telegram_service.db_adapter.reset_conversation(chat_id)
+                        await self.telegram_service.send_message(chat_id, 'Votre historique de conversation a été réinitialisé.')
+                    
                     elif text == '/help':
-                        await self.telegram_service._help_command(update, None)
+                        help_message = 'Commandes disponibles:\n\n' \
+                                   '/start - Démarrer la conversation et afficher le menu\n' \
+                                   '/chat - Commencer à discuter avec l\'IA\n' \
+                                   '/reset - Réinitialiser votre historique de conversation\n' \
+                                   '/help - Afficher ce message d\'aide'
+                        await self.telegram_service.send_message(chat_id, help_message)
                 else:
                     # Traiter comme un message texte normal
-                    await self.telegram_service.process_message(chat_id, username, text)
+                    response = await self.telegram_service.process_message(chat_id, username, text)
+                    # Envoyer la réponse via l'API Telegram
+                    await self.telegram_service.send_message(chat_id, response)
             
             # Gérer les callbacks des boutons inline
             elif 'callback_query' in update:
@@ -107,8 +127,11 @@ class ChatController:
                 username = callback_query['from'].get('username', 'inconnu')
                 data = callback_query.get('data', '')
                 
-                # Traiter le callback
-                await self.telegram_service.process_callback(callback_query)
+                # Traiter le callback directement
+                if data == "feedback_positive":
+                    await self.telegram_service.send_message(chat_id, "Merci pour votre feedback positif ! 😊")
+                elif data == "feedback_negative":
+                    await self.telegram_service.send_message(chat_id, "Je suis désolé que ma réponse n'ait pas été utile. Comment puis-je m'améliorer ?")
             
             return {"status": "ok"}
             
