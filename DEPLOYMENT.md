@@ -26,7 +26,7 @@ Ce document explique comment déployer le chatbot Telegram sur AWS Lambda en uti
 
 3. **Installer les dépendances**
    ```bash
-   pip install -r requirements-lambda.txt
+   pip install -r requirements.txt
    ```
 
 ## Configuration des variables d'environnement

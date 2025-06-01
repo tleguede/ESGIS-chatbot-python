@@ -91,7 +91,7 @@ function Install-Dependencies {
     }
     
     Write-Host "Installing dependencies..." -ForegroundColor Green
-    & "$VENV_DIR\Scripts\pip" install -r "$PSScriptRoot\requirements-lambda.txt"
+    # Utilisation d'un seul fichier requirements.txt pour toutes les dépendances
     & "$VENV_DIR\Scripts\pip" install -r "$PSScriptRoot\requirements.txt"
     
     if ($LASTEXITCODE -ne 0) {
@@ -122,7 +122,7 @@ function Invoke-Deploy {
     
     # Optimize Lambda package
     Write-Host "Optimizing Lambda package..." -ForegroundColor Cyan
-    Copy-Item -Path "$PSScriptRoot\requirements-lambda.txt" -Destination "$PSScriptRoot\requirements.txt" -Force
+    # Nous utilisons maintenant un seul fichier requirements.txt qui contient toutes les dépendances
     
     # Ensure mangum is installed
     Write-Host "Installing mangum in virtual environment..." -ForegroundColor Cyan
@@ -164,7 +164,8 @@ function Invoke-Deploy {
 
 function Start-Server {
     Write-Host "Starting FastAPI development server..." -ForegroundColor Green
-    & "$VENV_DIR\Scripts\uvicorn" src.main:app --reload
+    # Utiliser le port 3000 explicitement pour correspondre à la configuration dans .env
+    & "$VENV_DIR\Scripts\uvicorn" src.main:app --reload --port 3000
 }
 
 function Invoke-Tests {
