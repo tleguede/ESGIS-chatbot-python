@@ -47,7 +47,7 @@ class MistralClient:
                 'content': prompt
             })
             
-            # Appeler l'API Mistral
+            # Appeler l'API Mistral avec timeout explicite
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 json={
@@ -59,7 +59,8 @@ class MistralClient:
                 headers={
                     'Content-Type': 'application/json',
                     'Authorization': f'Bearer {self.api_key}'
-                }
+                },
+                timeout=(3.05, 30)  # (connect_timeout, read_timeout) en secondes
             )
             
             # Vérifier si la requête a réussi
@@ -68,6 +69,27 @@ class MistralClient:
             # Extraire et retourner la réponse
             return response.json()['choices'][0]['message']['content']
         
+        except requests.exceptions.Timeout:
+            logger.error("Timeout lors de l'appel à l'API Mistral")
+            return "Désolé, l'API Mistral met trop de temps à répondre. Veuillez réessayer dans quelques instants."
+            
+        except requests.exceptions.ConnectionError:
+            logger.error("Erreur de connexion à l'API Mistral")
+            return "Désolé, je ne peux pas me connecter à l'API Mistral en ce moment. Veuillez réessayer plus tard."
+            
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if hasattr(e, 'response') else 'inconnu'
+            logger.error(f"Erreur HTTP {status_code} lors de l'appel à l'API Mistral: {e}")
+            
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"Réponse de l'API: {e.response.text}")
+                
+                # Gérer spécifiquement les erreurs d'authentification
+                if e.response.status_code == 401:
+                    return "Désolé, il y a un problème d'authentification avec l'API Mistral. Veuillez contacter l'administrateur."
+            
+            return "Désolé, j'ai rencontré une erreur lors de la communication avec l'API Mistral."
+            
         except requests.exceptions.RequestException as e:
             logger.error(f"Erreur lors de l'appel à l'API Mistral: {e}")
             if hasattr(e, 'response') and e.response:

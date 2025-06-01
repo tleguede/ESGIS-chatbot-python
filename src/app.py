@@ -261,10 +261,31 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
             # 2. Configuration du webhook si en environnement Lambda
             if config.IS_LAMBDA_ENVIRONMENT:
                 logger.info("🌐 Configuration du webhook Telegram...")
-                if await setup_webhook():
-                    logger.info("✅ Configuration du webhook terminée avec succès")
-                else:
-                    logger.error("❌ Échec de la configuration du webhook")
+                # Essayer jusqu'à 3 fois avec un délai entre les tentatives
+                max_retries = 3
+                retry_delay = 2  # secondes
+                
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        if await setup_webhook():
+                            logger.info("✅ Configuration du webhook terminée avec succès")
+                            break
+                        else:
+                            if attempt < max_retries:
+                                logger.warning(f"Tentative {attempt}/{max_retries} échouée, nouvelle tentative dans {retry_delay} secondes...")
+                                await asyncio.sleep(retry_delay)
+                                # Augmenter le délai pour la prochaine tentative (backoff exponentiel)
+                                retry_delay *= 2
+                            else:
+                                logger.error(f"❌ Échec de la configuration du webhook après {max_retries} tentatives")
+                    except Exception as e:
+                        logger.error(f"Erreur lors de la tentative {attempt}/{max_retries} de configuration du webhook: {str(e)}")
+                        if attempt < max_retries:
+                            logger.warning(f"Nouvelle tentative dans {retry_delay} secondes...")
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2
+                        else:
+                            logger.error(f"❌ Échec de la configuration du webhook après {max_retries} tentatives")
             else:
                 # 3. Mode développement : D'abord supprimer tout webhook existant, puis démarrer en mode polling
                 logger.info("🔍 Mode développement : vérification des webhooks existants...")

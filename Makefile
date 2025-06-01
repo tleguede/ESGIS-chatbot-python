@@ -24,7 +24,8 @@ clean:
 
 # Créer un environnement virtuel
 venv:
-	python -m venv venv
+	# Essayer d'abord avec python3, puis avec python si python3 échoue
+	python3 -m venv venv || python -m venv venv || (echo "Ni python3 ni python ne sont disponibles. Veuillez installer Python." && exit 1)
 
 # Installer les dépendances
 install: venv

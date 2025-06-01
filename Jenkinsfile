@@ -16,6 +16,15 @@ pipeline {
         stage('Initialisation') {
             steps {
                 sh "echo Branch name ${BRANCH_NAME}"
+                
+                // Vérifier l'installation de Python
+                sh '''
+                    echo "Vérification de l'environnement Python..."
+                    which python3 || which python || echo "Python n'est pas installé ou n'est pas dans le PATH"
+                    python3 --version || python --version || echo "Impossible d'obtenir la version de Python"
+                '''
+                
+                // Créer l'environnement virtuel et installer les dépendances
                 sh "make venv && make install"
             }
         }

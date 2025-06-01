@@ -81,6 +81,10 @@ def lambda_handler(event, context):
             return handler(event, context)
         except Exception as e:
             logger.exception("Échec du traitement avec Mangum")
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'error': 'Erreur lors du traitement de la requête', 'details': str(e)})
+            }
     
     except Exception as e:
         logger.exception("Erreur inattendue dans le gestionnaire Lambda")
