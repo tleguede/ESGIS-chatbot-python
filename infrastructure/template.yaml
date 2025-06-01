@@ -69,7 +69,7 @@ Resources:
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
           # URL de l'API construite dynamiquement
-          API_URL: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
+          API_URL: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
       # Intégration avec API Gateway sans référence directe
       Events:
         ApiEvent:
@@ -82,6 +82,10 @@ Resources:
           Properties:
             Path: /{proxy+}
             Method: ANY
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -103,6 +107,10 @@ Resources:
               Resource: !Sub '${DynamoDBTable.Arn}/index/*'
 
   # Nous utilisons l'API Gateway implicite créée par SAM
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
 
 Outputs:
   DynamoDBTableName:
@@ -110,4 +118,4 @@ Outputs:
     Description: Name of the DynamoDB table
   ApiUrl:
     Description: URL of your API
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
