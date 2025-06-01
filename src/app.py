@@ -265,6 +265,17 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
         logger.info("🚀 Démarrage de l'application...")
         logger.info("="*60)
         
+        # Afficher les variables d'environnement importantes (sans les valeurs sensibles)
+        env_info = {
+            "ENV": config.ENV_NAME,
+            "DATABASE_TYPE": "dynamodb" if not config.USE_MEMORY_ADAPTER else "memory",
+            "API_URL": config.API_URL,
+            "IS_LAMBDA": config.IS_LAMBDA_ENVIRONMENT,
+            "TELEGRAM_BOT_TOKEN": "[CONFIGURED]" if config.TELEGRAM_BOT_TOKEN else "[MISSING]",
+            "MISTRAL_API_KEY": "[CONFIGURED]" if config.MISTRAL_API_KEY else "[MISSING]"
+        }
+        logger.info(f"📊 Configuration: {env_info}")
+        
         try:
             # 1. Vérification des variables d'environnement
             missing_vars = validate_env()
@@ -272,15 +283,17 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
                 logger.warning(f"⚠️  Variables d'environnement manquantes : {', '.join(missing_vars)}")
                 logger.warning("ℹ️  Certaines fonctionnalités pourraient ne pas fonctionner correctement")
             
-            # 2. Configuration du webhook si en environnement Lambda
-            if config.IS_LAMBDA_ENVIRONMENT:
-                logger.info("🌐 Configuration du webhook Telegram...")
-                # Essayer jusqu'à 3 fois avec un délai entre les tentatives
-                max_retries = 3
-                retry_delay = 2  # secondes
+            # 2. Configuration du webhook si en environnement Lambda et si API_URL est configurée
+            # Désactiver temporairement la configuration du webhook au démarrage pour éviter les timeouts
+            if False and config.IS_LAMBDA_ENVIRONMENT and config.API_URL:
+                logger.info(f"🌐 Configuration du webhook Telegram vers {config.API_URL}...")
+                # Essayer jusqu'à 2 fois avec un délai court entre les tentatives
+                max_retries = 2
+                retry_delay = 1  # secondes
                 
                 for attempt in range(1, max_retries + 1):
                     try:
+                        logger.info(f"Tentative {attempt}/{max_retries} de configuration du webhook...")
                         if await setup_webhook():
                             logger.info("✅ Configuration du webhook terminée avec succès")
                             break
@@ -293,7 +306,9 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
                             else:
                                 logger.error(f"❌ Échec de la configuration du webhook après {max_retries} tentatives")
                     except Exception as e:
+                        error_details = traceback.format_exc()
                         logger.error(f"Erreur lors de la tentative {attempt}/{max_retries} de configuration du webhook: {str(e)}")
+                        logger.error(f"Détails: {error_details}")
                         if attempt < max_retries:
                             logger.warning(f"Nouvelle tentative dans {retry_delay} secondes...")
                             await asyncio.sleep(retry_delay)

@@ -58,6 +58,9 @@ Resources:
       CodeUri: ../
       Handler: src/lambda.lambda_handler
       Runtime: python3.9
+      # Augmenter le timeout et la mémoire pour éviter les timeouts
+      Timeout: 30
+      MemorySize: 256
       Environment:
         Variables:
           TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken

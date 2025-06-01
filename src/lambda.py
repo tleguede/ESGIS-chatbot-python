@@ -3,7 +3,9 @@ Point d'entrée pour AWS Lambda.
 """
 import json
 import logging
+import os
 import traceback
+import uuid
 from mangum import Mangum
 
 from .app import create_app
@@ -20,6 +22,14 @@ app = create_app()
 handler = Mangum(app)
 
 
+# Définir les headers CORS pour les réponses d'erreur
+CORS_HEADERS = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': '*'
+}
+
 def lambda_handler(event, context):
     """
     Fonction de gestionnaire Lambda.
@@ -31,6 +41,17 @@ def lambda_handler(event, context):
     Returns:
         Réponse de l'API
     """
+    # Afficher des informations de débogage sur l'environnement
+    logger.info(f"Démarrage du gestionnaire Lambda avec timeout restant: {context.get_remaining_time_in_millis()/1000:.2f}s")
+    logger.info(f"Variables d'environnement: API_URL={os.environ.get('API_URL')}, ENV={os.environ.get('ENV')}")
+    
+    # Vérifier rapidement si nous sommes dans un cold start
+    if not hasattr(lambda_handler, "_initialized"):
+        logger.info("Cold start détecté - Première exécution de la fonction")
+        lambda_handler._initialized = True
+    else:
+        logger.info("Warm start - La fonction a déjà été initialisée")
+    
     try:
         # Log l'événement pour le débogage (version sécurisée qui ne log pas les données sensibles)
         logger.info("Type d'événement reçu: %s", type(event).__name__)
@@ -63,48 +84,27 @@ def lambda_handler(event, context):
                         'statusCode': 400,
                         'body': json.dumps({'error': 'Invalid JSON format'})
                     }
-            
-            logger.info("Corps de la requête: %s", json.dumps(body)[:500])  # Limiter la taille du log
-            
-            if 'message' in body or 'callback_query' in body or 'update_id' in body:
-                logger.info("Mise à jour Telegram reçue")
-                # Le traitement est géré par le bot Telegram via l'application FastAPI
-                response = handler(event, context)
-                logger.info("Réponse du gestionnaire: %s", response)
-                return response
-        
-        # Si on arrive ici, c'est qu'aucun gestionnaire n'a été trouvé
-        logger.warning("Aucun gestionnaire approprié trouvé pour cet événement")
-        
-        # Essayer de passer l'événement à Mangum quand même, au cas où
-        try:
-            logger.info("Tentative de traitement avec Mangum")
-            return handler(event, context)
-        except Exception as e:
-            logger.exception("Échec du traitement avec Mangum")
             return {
-                'statusCode': 500,
-                'body': json.dumps({'error': 'Erreur lors du traitement de la requête', 'details': str(e)})
+                "statusCode": 400,
+                "body": json.dumps({"error": "Type d'événement non pris en charge"}),
+                "headers": CORS_HEADERS
             }
-    
     except Exception as e:
-        # Log détaillé de l'erreur avec traceback complet
-        error_id = hash(str(e)) % 10000  # Identifiant simple pour retrouver l'erreur dans les logs
-        logger.exception(f"Erreur inattendue dans le gestionnaire Lambda [ID: {error_id}]")
-        logger.error(f"Traceback complet: {traceback.format_exc()}")
+        # Générer un ID d'erreur unique pour faciliter le débogage
+        error_id = str(uuid.uuid4())
+        error_details = traceback.format_exc()
         
-        # Retourner une réponse d'erreur avec l'ID pour faciliter le débogage
+        # Journaliser l'erreur avec l'ID pour référence
+        logger.error(f"Erreur non gérée (ID: {error_id}): {str(e)}")
+        logger.error(f"Détails: {error_details}")
+        
+        # Retourner une réponse d'erreur avec l'ID pour référence
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',  # Pour éviter les problèmes CORS
-                'Access-Control-Allow-Headers': '*',
-                'Access-Control-Allow-Methods': '*'
-            },
+            'headers': CORS_HEADERS,
             'body': json.dumps({
                 'error': 'Erreur interne du serveur', 
-                'error_id': str(error_id),
+                'error_id': error_id,
                 'message': str(e)
             })
         }
