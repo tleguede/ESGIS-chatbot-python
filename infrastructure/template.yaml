@@ -68,8 +68,8 @@ Resources:
           DATABASE_TYPE: "dynamodb"
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
-          # Utiliser une URL prédéfinie qui sera mise à jour après le déploiement
-          API_URL: !Sub 'https://${AWS::StackName}-api.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
+          # URL de l'API avec le stage name
+          API_URL: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}/'
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -137,7 +137,23 @@ Resources:
       - RootMethod
     Properties:
       RestApiId: !Ref RestApi
+      Description: !Sub "Déploiement pour ${EnvironmentName}"
+      # Nous ne définissons pas de StageName ici car nous utilisons une ressource Stage séparée
+  
+  # Stage de l'API avec configuration CORS
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref RestApi
+      DeploymentId: !Ref ApiDeployment
       StageName: !Ref EnvironmentName
+      # Activer CORS au niveau du stage
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          MetricsEnabled: true
+          DataTraceEnabled: true
+          LoggingLevel: INFO
 
   # Permission pour que l'API Gateway puisse appeler la fonction Lambda
   LambdaPermission:
@@ -147,6 +163,62 @@ Resources:
       FunctionName: !GetAtt Function.Arn
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*"
+      
+  # Configuration CORS pour la ressource racine
+  RootCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !GetAtt RestApi.RootResourceId
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: "{}"
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: "{\"statusCode\": 200}"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            
+  # Configuration CORS pour la ressource proxy
+  ProxyCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ProxyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: "{}"
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: "{\"statusCode\": 200}"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
 Outputs:
   DynamoDBTableName:
@@ -154,3 +226,6 @@ Outputs:
   ApiUrl:
     Description: URL of your API
     Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}/"
+  ApiBaseUrl:
+    Description: Base URL of your API (without stage name)
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/"

@@ -15,11 +15,24 @@ from .config.env import config
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Créer l'application FastAPI
-app = create_app()
+# Utiliser un singleton pour l'application FastAPI afin d'éviter les problèmes de "warm start"
+_app = None
+_handler = None
 
-# Créer le gestionnaire Lambda
-handler = Mangum(app)
+def get_application():
+    """Retourne l'instance singleton de l'application FastAPI."""
+    global _app
+    if _app is None:
+        logger.info("Initialisation de l'application FastAPI (première fois ou après cold start)")
+        _app = create_app()
+    return _app
+
+def get_handler():
+    """Retourne l'instance singleton du gestionnaire Mangum."""
+    global _handler
+    if _handler is None:
+        _handler = Mangum(get_application())
+    return _handler
 
 
 # Définir les headers CORS pour les réponses d'erreur
@@ -41,49 +54,53 @@ def lambda_handler(event, context):
     Returns:
         Réponse de l'API
     """
+    # Générer un ID unique pour cette requête pour faciliter le suivi dans les logs
+    request_id = str(uuid.uuid4())[:8]
+    
     # Afficher des informations de débogage sur l'environnement
-    logger.info(f"Démarrage du gestionnaire Lambda avec timeout restant: {context.get_remaining_time_in_millis()/1000:.2f}s")
-    logger.info(f"Variables d'environnement: API_URL={os.environ.get('API_URL')}, ENV={os.environ.get('ENV')}")
+    logger.info(f"[{request_id}] Démarrage du gestionnaire Lambda avec timeout restant: {context.get_remaining_time_in_millis()/1000:.2f}s")
+    logger.info(f"[{request_id}] Variables d'environnement: API_URL={os.environ.get('API_URL')}, ENV={os.environ.get('ENV')}")
     
     # Vérifier rapidement si nous sommes dans un cold start
     if not hasattr(lambda_handler, "_initialized"):
-        logger.info("Cold start détecté - Première exécution de la fonction")
+        logger.info(f"[{request_id}] Cold start détecté - Première exécution de la fonction")
         lambda_handler._initialized = True
     else:
-        logger.info("Warm start - La fonction a déjà été initialisée")
+        logger.info(f"[{request_id}] Warm start - La fonction a déjà été initialisée")
     
     try:
         # Log l'événement pour le débogage (version sécurisée qui ne log pas les données sensibles)
-        logger.info("Type d'événement reçu: %s", type(event).__name__)
-        logger.debug("Événement complet: %s", json.dumps(event))
+        logger.info(f"[{request_id}] Type d'événement reçu: {type(event).__name__}")
+        logger.debug(f"[{request_id}] Événement complet: {json.dumps(event)}")
         
-        # Vérifier si c'est un événement API Gateway V2 (HTTP API)
-        if 'version' in event and event.get('version') == '2.0':
-            logger.info("Événement API Gateway V2 détecté")
-            return handler(event, context)
+        # Déterminer le type d'événement et le traiter en conséquence
+        if "httpMethod" in event:  # API Gateway v1
+            logger.info(f"[{request_id}] Traitement d'un événement API Gateway v1")
+            return get_handler()(event, context)
             
-        # Vérifier si c'est un événement API Gateway V1 (REST API)
-        if 'httpMethod' in event and 'resource' in event:
-            logger.info("Événement API Gateway V1 détecté")
-            return handler(event, context)
-        
-        # Vérifier si c'est un événement direct depuis API Gateway
-        if 'requestContext' in event and 'http' in event['requestContext']:
-            logger.info("Événement API Gateway direct détecté")
-            return handler(event, context)
-        
-        # Vérifier si c'est un événement Telegram (via API Gateway ou autre)
-        if 'body' in event:
-            body = event['body']
-            if isinstance(body, str):
-                try:
-                    body = json.loads(body)
-                except json.JSONDecodeError:
-                    logger.error("Impossible de décoder le corps de la requête en JSON")
-                    return {
-                        'statusCode': 400,
-                        'body': json.dumps({'error': 'Invalid JSON format'})
-                    }
+        elif "requestContext" in event and "http" in event["requestContext"]:  # API Gateway v2
+            logger.info(f"[{request_id}] Traitement d'un événement API Gateway v2")
+            return get_handler()(event, context)
+            
+        elif "version" in event and event.get("version") == "2.0":  # API Gateway v2 format alternatif
+            logger.info(f"[{request_id}] Traitement d'un événement API Gateway v2 (format alternatif)")
+            return get_handler()(event, context)
+            
+        elif "update_id" in event:  # Événement Telegram direct
+            logger.info(f"[{request_id}] Traitement d'un événement Telegram direct")
+            # Traiter l'événement Telegram ici si nécessaire
+            return {
+                "statusCode": 200,
+                "body": json.dumps({"success": True}),
+                "headers": CORS_HEADERS
+            }
+            
+        # Si c'est un autre type d'événement, essayer de le traiter comme un événement API Gateway générique
+        logger.warning(f"[{request_id}] Type d'événement inconnu, tentative de traitement générique")
+        try:
+            return get_handler()(event, context)
+        except Exception as handler_error:
+            logger.error(f"[{request_id}] Échec du traitement générique: {str(handler_error)}")
             return {
                 "statusCode": 400,
                 "body": json.dumps({"error": "Type d'événement non pris en charge"}),
@@ -95,8 +112,8 @@ def lambda_handler(event, context):
         error_details = traceback.format_exc()
         
         # Journaliser l'erreur avec l'ID pour référence
-        logger.error(f"Erreur non gérée (ID: {error_id}): {str(e)}")
-        logger.error(f"Détails: {error_details}")
+        logger.error(f"[{request_id}] Erreur non gérée (ID: {error_id}): {str(e)}")
+        logger.error(f"[{request_id}] Détails: {error_details}")
         
         # Retourner une réponse d'erreur avec l'ID pour référence
         return {
