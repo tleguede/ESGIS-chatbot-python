@@ -68,8 +68,22 @@ Resources:
           DATABASE_TYPE: "dynamodb"
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
-          # URL de l'API avec le stage name
-          API_URL: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
+          # URL de l'API sans le stage name
+          API_URL: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
+      # Intégration avec API Gateway
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /
+            Method: ANY
+        ProxyApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /{proxy+}
+            Method: ANY
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -90,9 +104,21 @@ Resources:
                 - 'dynamodb:Query'
               Resource: !Sub '${DynamoDBTable.Arn}/index/*'
 
+  # Définition simplifiée de l'API Gateway
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      EndpointConfiguration: REGIONAL
+      Cors:
+        AllowMethods: "'*'"
+        AllowHeaders: "'*'"
+        AllowOrigin: "'*'"
+
 Outputs:
   DynamoDBTableName:
     Value: !Ref DynamoDBTable
+    Description: Name of the DynamoDB table
   ApiUrl:
     Description: URL of your API
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
