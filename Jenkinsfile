@@ -24,8 +24,11 @@ pipeline {
                     python3 --version || python --version || echo "Impossible d'obtenir la version de Python"
                 '''
                 
-                // Créer l'environnement virtuel et installer les dépendances
-                sh "make venv && make install"
+                // Installer les dépendances directement sans utiliser l'environnement virtuel
+                sh '''
+                    echo "Installation des dépendances..."
+                    pip install -r requirements.txt || python -m pip install -r requirements.txt || python3 -m pip install -r requirements.txt
+                '''
             }
         }
 
@@ -87,10 +90,22 @@ pipeline {
                     def envVars = readFile('.env')
                     def telegramToken = (envVars =~ /TELEGRAM_BOT_TOKEN=["']?([^\r\n"']+)["']?/)[0][1]
                     def mistralKey = (envVars =~ /MISTRAL_API_KEY=["']?([^\r\n"']+)["']?/)[0][1]
-                    def api_url = (envVars =~ /API_URL=["']?([^\r\n"']+)["']?/)[0][1]
                     
-                    // Deploy with the environment variables
-                    sh "make deploy env=${BRANCH_NAME} TELEGRAM_BOT_TOKEN='${telegramToken}' MISTRAL_API_KEY='${mistralKey}' API_URL='${api_url}'"
+                    // Deploy with the environment variables (sans API_URL qui sera récupérée après le déploiement)
+                    sh "make deploy env=${BRANCH_NAME} TELEGRAM_BOT_TOKEN='${telegramToken}' MISTRAL_API_KEY='${mistralKey}'"
+                    
+                    // Récupérer l'URL de l'API depuis les outputs CloudFormation
+                    def apiUrl = sh(script: "aws cloudformation describe-stacks --stack-name multi-stack-${BRANCH_NAME} --query \"Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue\" --output text", returnStdout: true).trim()
+                    echo "API URL récupérée: ${apiUrl}"
+                    
+                    // Mettre à jour le fichier .env avec la nouvelle URL
+                    sh "sed -i 's|API_URL=.*|API_URL=${apiUrl}|g' .env"
+                    
+                    // Sauvegarder le fichier .env mis à jour dans les credentials Jenkins
+                    withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
+                        sh "cat .env > $ENV_FILE"
+                        echo "Fichier .env mis à jour et sauvegardé dans les credentials"
+                    }
                 }
             }
         }

@@ -24,15 +24,15 @@ clean:
 
 # Créer un environnement virtuel
 venv:
-	python3 -m venv venv || python -m venv venv
+	python3 -m venv venv || python -m venv venv || echo "Environnement virtuel déjà créé ou impossible à créer"
 
 # Installer les dépendances
 install: venv
-	venv\Scripts\pip install -r requirements.txt
+	python -m pip install -r requirements.txt
 
 # Exécuter les tests
 test:
-	# venv\Scripts\pytest
+	# python -m pytest
 
 # Construire le package SAM
 build:
@@ -45,11 +45,10 @@ deploy-local:
 deploy:
 	@echo "Deploying to " ${env}
 	# Vérifier que les paramètres requis sont fournis
-	@if [ -z "${TELEGRAM_BOT_TOKEN}" ]; then echo "Erreur: TELEGRAM_BOT_TOKEN est requis"; exit 1; fi
-	@if [ -z "${MISTRAL_API_KEY}" ]; then echo "Erreur: MISTRAL_API_KEY est requis"; exit 1; fi
-	@if [ -z "${API_URL}" ]; then echo "Erreur: API_URL est requis"; exit 1; fi
+	if [ -z "${TELEGRAM_BOT_TOKEN}" ]; then echo "Erreur: TELEGRAM_BOT_TOKEN est requis"; exit 1; fi
+	if [ -z "${MISTRAL_API_KEY}" ]; then echo "Erreur: MISTRAL_API_KEY est requis"; exit 1; fi
 	
-	sam deploy --resolve-s3 --template-file .aws-sam/build/template.yaml --stack-name multi-stack-${env} \
+	sam deploy --resolve-s3 --template-file infrastructure/template.yaml --stack-name multi-stack-${env} \
          --capabilities CAPABILITY_IAM --region ${AWS_REGION} \
          --parameter-overrides \
            EnvironmentName=${env} \
@@ -59,7 +58,7 @@ deploy:
 
 
 serve:
-	venv\Scripts\python -m uvicorn src.main:app --reload
+	python -m uvicorn src.main:app --reload
 
 test-endpoint:
 	@echo "Running endpoint tests..."
