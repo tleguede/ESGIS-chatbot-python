@@ -50,6 +50,20 @@ Resources:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
 
+  # Définir d'abord l'API Gateway
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - '*'
+        AllowMethods:
+          - '*'
+  
+  # Ensuite définir la fonction Lambda qui dépend de l'API Gateway
   Function:
     Type: AWS::Serverless::Function
     Properties:
@@ -64,6 +78,7 @@ Resources:
           DATABASE_TYPE: "dynamodb"
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
+          # Utiliser l'URL complète de l'API Gateway
           API_URL: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
       Policies:
         - Version: '2012-10-17'
@@ -79,25 +94,16 @@ Resources:
               Action:
                 - 'dynamodb:Query'           # Autorisation supplémentaire pour les requêtes
               Resource: !Sub '${DynamoDBTable.Arn}/index/*'  # Pour les index secondaires si nécessaire
+      # Définir l'événement API après avoir défini l'API
       Events:
-        Api:
+        ApiEvent:
           Type: HttpApi
           Properties:
             ApiId: !Ref Api
             Path: /{proxy+}
             Method: ANY
 
-  Api:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
-      CorsConfiguration:
-        AllowOrigins:
-          - '*'
-        AllowHeaders:
-          - '*'
-        AllowMethods:
-          - '*'
+
 
 
 Outputs:
