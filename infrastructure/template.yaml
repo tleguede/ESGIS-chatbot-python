@@ -69,165 +69,30 @@ Resources:
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
           # URL de l'API avec le stage name
-          API_URL: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/'
+          API_URL: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
       Policies:
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
               Action:
-                - 'dynamodb:PutItem'
                 - 'dynamodb:GetItem'
+                - 'dynamodb:DeleteItem'
+                - 'dynamodb:PutItem'
                 - 'dynamodb:Query'
+                - 'dynamodb:UpdateItem'
                 - 'dynamodb:BatchWriteItem'
+                - 'dynamodb:BatchGetItem'
+                - 'dynamodb:DescribeTable'
+                - 'dynamodb:ConditionCheckItem'
               Resource: !GetAtt DynamoDBTable.Arn
             - Effect: Allow
               Action:
                 - 'dynamodb:Query'
               Resource: !Sub '${DynamoDBTable.Arn}/index/*'
 
-  # Créer l'API Gateway séparément
-  RestApi:
-    Type: AWS::ApiGateway::RestApi
-    Properties:
-      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
-      Description: API Gateway pour le chatbot
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
-
-  # Créer une ressource proxy pour gérer tous les chemins
-  ProxyResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestApi
-      ParentId: !GetAtt RestApi.RootResourceId
-      PathPart: "{proxy+}"
-
-  # Méthode ANY pour la ressource proxy
-  ProxyMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ProxyResource
-      HttpMethod: ANY
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Function.Arn}/invocations"
-
-  # Méthode ANY pour la racine
-  RootMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !GetAtt RestApi.RootResourceId
-      HttpMethod: ANY
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Function.Arn}/invocations"
-
-  # Déploiement de l'API
-  # Nous utilisons un nom unique pour le déploiement afin d'éviter les problèmes de mise à jour
-  ApiDeploymentV2:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - ProxyMethod
-      - RootMethod
-      - ProxyCorsMethod
-      - RootCorsMethod
-    Properties:
-      RestApiId: !Ref RestApi
-      Description: !Sub "Déploiement pour ${EnvironmentName} - V2"
-  
-  # Stage de l'API avec configuration CORS
-  ApiStage:
-    Type: AWS::ApiGateway::Stage
-    Properties:
-      RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeploymentV2
-      StageName: !Ref EnvironmentName
-      # Activer CORS au niveau du stage
-      MethodSettings:
-        - ResourcePath: "/*"
-          HttpMethod: "*"
-          MetricsEnabled: true
-          DataTraceEnabled: true
-          LoggingLevel: INFO
-
-  # Permission pour que l'API Gateway puisse appeler la fonction Lambda
-  LambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt Function.Arn
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*"
-      
-  # Configuration CORS pour la ressource racine
-  RootCorsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !GetAtt RestApi.RootResourceId
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-            ResponseTemplates:
-              application/json: "{}"
-        PassthroughBehavior: WHEN_NO_MATCH
-        RequestTemplates:
-          application/json: "{\"statusCode\": 200}"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-            
-  # Configuration CORS pour la ressource proxy
-  ProxyCorsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestApi
-      ResourceId: !Ref ProxyResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-            ResponseTemplates:
-              application/json: "{}"
-        PassthroughBehavior: WHEN_NO_MATCH
-        RequestTemplates:
-          application/json: "{\"statusCode\": 200}"
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
 Outputs:
   DynamoDBTableName:
     Value: !Ref DynamoDBTable
   ApiUrl:
     Description: URL of your API
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/"
-  ApiBaseUrl:
-    Description: Base URL of your API (without stage name)
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
