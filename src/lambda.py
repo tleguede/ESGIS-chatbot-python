@@ -1,5 +1,5 @@
 """
-Point d'entrée pour AWS Lambda.
+Point d'entrée pour AWS Lambda. yeah
 """
 import json
 import logging
