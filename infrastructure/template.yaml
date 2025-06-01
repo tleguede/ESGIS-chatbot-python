@@ -50,20 +50,7 @@ Resources:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
 
-  # Définir d'abord l'API Gateway
-  Api:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
-      CorsConfiguration:
-        AllowOrigins:
-          - '*'
-        AllowHeaders:
-          - '*'
-        AllowMethods:
-          - '*'
-  
-  # Ensuite définir la fonction Lambda qui dépend de l'API Gateway
+  # Définir d'abord la fonction Lambda
   Function:
     Type: AWS::Serverless::Function
     Properties:
@@ -78,38 +65,89 @@ Resources:
           DATABASE_TYPE: "dynamodb"
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
-          # Utiliser l'URL complète de l'API Gateway
-          API_URL: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
+          # Utiliser une URL prédéfinie qui sera mise à jour après le déploiement
+          API_URL: !Sub 'https://${AWS::StackName}-api.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
       Policies:
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
               Action:
-                - 'dynamodb:PutItem'         # Pour sauvegarder les messages
-                - 'dynamodb:GetItem'         # Pour récupérer des messages spécifiques
-                - 'dynamodb:Query'           # Pour les requêtes efficaces sur les clés de partition
-                - 'dynamodb:BatchWriteItem'   # Pour les opérations de suppression par lots
+                - 'dynamodb:PutItem'
+                - 'dynamodb:GetItem'
+                - 'dynamodb:Query'
+                - 'dynamodb:BatchWriteItem'
               Resource: !GetAtt DynamoDBTable.Arn
             - Effect: Allow
               Action:
-                - 'dynamodb:Query'           # Autorisation supplémentaire pour les requêtes
-              Resource: !Sub '${DynamoDBTable.Arn}/index/*'  # Pour les index secondaires si nécessaire
-      # Définir l'événement API après avoir défini l'API
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref Api
-            Path: /{proxy+}
-            Method: ANY
+                - 'dynamodb:Query'
+              Resource: !Sub '${DynamoDBTable.Arn}/index/*'
 
+  # Créer l'API Gateway séparément
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
+      Description: API Gateway pour le chatbot
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
 
+  # Créer une ressource proxy pour gérer tous les chemins
+  ProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: "{proxy+}"
 
+  # Méthode ANY pour la ressource proxy
+  ProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Function.Arn}/invocations"
+
+  # Méthode ANY pour la racine
+  RootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !GetAtt RestApi.RootResourceId
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Function.Arn}/invocations"
+
+  # Déploiement de l'API
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ProxyMethod
+      - RootMethod
+    Properties:
+      RestApiId: !Ref RestApi
+      StageName: !Ref EnvironmentName
+
+  # Permission pour que l'API Gateway puisse appeler la fonction Lambda
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt Function.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*"
 
 Outputs:
   DynamoDBTableName:
     Value: !Ref DynamoDBTable
   ApiUrl:
     Description: URL of your API
-    Value:
-      Fn::Sub: 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}/"
