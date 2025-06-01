@@ -130,22 +130,24 @@ Resources:
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Function.Arn}/invocations"
 
   # Déploiement de l'API
-  ApiDeployment:
+  # Nous utilisons un nom unique pour le déploiement afin d'éviter les problèmes de mise à jour
+  ApiDeploymentV2:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - ProxyMethod
       - RootMethod
+      - ProxyCorsMethod
+      - RootCorsMethod
     Properties:
       RestApiId: !Ref RestApi
-      Description: !Sub "Déploiement pour ${EnvironmentName}"
-      # Nous ne définissons pas de StageName ici car nous utilisons une ressource Stage séparée
+      Description: !Sub "Déploiement pour ${EnvironmentName} - V2"
   
   # Stage de l'API avec configuration CORS
   ApiStage:
     Type: AWS::ApiGateway::Stage
     Properties:
       RestApiId: !Ref RestApi
-      DeploymentId: !Ref ApiDeployment
+      DeploymentId: !Ref ApiDeploymentV2
       StageName: !Ref EnvironmentName
       # Activer CORS au niveau du stage
       MethodSettings:
