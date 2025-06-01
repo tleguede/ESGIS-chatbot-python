@@ -114,7 +114,7 @@ Resources:
           - X-Amz-Security-Token
       
   # Stage pour l'API Gateway
-  ApiStage:
+  ApiGatewayDefaultStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
       ApiId: !Ref Api

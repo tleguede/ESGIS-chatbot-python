@@ -15,8 +15,12 @@ run:
 
 # Nettoyer le projet
 clean:
-	rm -rf venv __pycache__ *.egg-info .pytest_cache .aws-sam
-	find . -type d -name __pycache__ -exec rm -rf {} +
+	if exist "venv" rd /s /q venv
+	if exist "__pycache__" rd /s /q __pycache__
+	if exist "*.egg-info" rd /s /q *.egg-info
+	if exist ".pytest_cache" rd /s /q .pytest_cache
+	if exist ".aws-sam" rd /s /q .aws-sam
+	for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
 
 # Créer un environnement virtuel
 venv:
@@ -24,11 +28,11 @@ venv:
 
 # Installer les dépendances
 install: venv
-	venv/bin/pip install -r requirements.txt
+	venv\Scripts\pip install -r requirements.txt
 
 # Exécuter les tests
 test:
-	# venv/bin/pytest
+	# venv\Scripts\pytest
 
 # Construire le package SAM
 build:
@@ -55,7 +59,7 @@ deploy:
 
 
 serve:
-	venv/bin/python -m uvicorn src.main:app --reload
+	venv\Scripts\python -m uvicorn src.main:app --reload
 
 test-endpoint:
 	@echo "Running endpoint tests..."
