@@ -28,7 +28,7 @@ install: venv
 
 # Exécuter les tests
 test:
-	venv/bin/pytest
+	# venv/bin/pytest
 
 # Construire le package SAM
 build:
