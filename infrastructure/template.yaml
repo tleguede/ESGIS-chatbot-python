@@ -72,16 +72,6 @@ Resources:
           API_URL: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
       # Intégration avec API Gateway sans référence directe
       Events:
-        ApiEvent:
-          Type: Api
-          Properties:
-            Path: /
-            Method: ANY
-        ProxyApiEvent:
-          Type: Api
-          Properties:
-            Path: /{proxy+}
-            Method: ANY
         Api:
           Type: HttpApi
           Properties:
