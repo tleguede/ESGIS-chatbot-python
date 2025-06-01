@@ -3,6 +3,7 @@ Point d'entrée pour AWS Lambda.
 """
 import json
 import logging
+import traceback
 from mangum import Mangum
 
 from .app import create_app
@@ -87,10 +88,25 @@ def lambda_handler(event, context):
             }
     
     except Exception as e:
-        logger.exception("Erreur inattendue dans le gestionnaire Lambda")
+        # Log détaillé de l'erreur avec traceback complet
+        error_id = hash(str(e)) % 10000  # Identifiant simple pour retrouver l'erreur dans les logs
+        logger.exception(f"Erreur inattendue dans le gestionnaire Lambda [ID: {error_id}]")
+        logger.error(f"Traceback complet: {traceback.format_exc()}")
+        
+        # Retourner une réponse d'erreur avec l'ID pour faciliter le débogage
         return {
             'statusCode': 500,
-            'body': json.dumps({'error': 'Erreur interne du serveur'})
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',  # Pour éviter les problèmes CORS
+                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Methods': '*'
+            },
+            'body': json.dumps({
+                'error': 'Erreur interne du serveur', 
+                'error_id': str(error_id),
+                'message': str(e)
+            })
         }
     
     # Événement non géré

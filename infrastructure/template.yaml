@@ -64,6 +64,7 @@ Resources:
           DATABASE_TYPE: "dynamodb"
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
+          API_URL: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -90,6 +91,13 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       Name: !Sub "chatbot-apigateway-${EnvironmentName}"
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - '*'
+        AllowMethods:
+          - '*'
 
 
 Outputs:

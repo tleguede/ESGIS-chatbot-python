@@ -5,7 +5,9 @@ import asyncio
 import logging
 import os
 import requests
-from fastapi import FastAPI
+import traceback
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from typing import Optional
 
 from .config.env import config, validate_env
@@ -60,6 +62,18 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
         description="API pour le chatbot Telegram",
         version="1.0.0"
     )
+    
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        """Gestionnaire global d'exceptions pour l'application."""
+        error_id = os.urandom(8).hex()
+        error_msg = f"Erreur non gérée [{error_id}]: {str(exc)}"
+        logger.error(error_msg)
+        logger.error(f"Détails de l'erreur: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "error_id": error_id}
+        )
     
     # Route racine qui redirige vers la documentation (ajoutée tôt pour éviter les erreurs 500)
     from fastapi.responses import RedirectResponse
