@@ -69,7 +69,7 @@ Resources:
           DYNAMO_TABLE: !Ref DynamoDBTable
           ENV: !Ref EnvironmentName
           # URL de l'API avec le stage name
-          API_URL: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}/'
+          API_URL: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/'
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -227,7 +227,7 @@ Outputs:
     Value: !Ref DynamoDBTable
   ApiUrl:
     Description: URL of your API
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}/"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/"
   ApiBaseUrl:
     Description: Base URL of your API (without stage name)
     Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/"
