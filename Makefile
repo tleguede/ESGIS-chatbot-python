@@ -40,10 +40,18 @@ deploy-local:
 
 deploy:
 	@echo "Deploying to " ${env}
-	# Extract env from the branch name
-
+	# Vérifier que les paramètres requis sont fournis
+	@if [ -z "${TELEGRAM_BOT_TOKEN}" ]; then echo "Erreur: TELEGRAM_BOT_TOKEN est requis"; exit 1; fi
+	@if [ -z "${MISTRAL_API_KEY}" ]; then echo "Erreur: MISTRAL_API_KEY est requis"; exit 1; fi
+	@if [ -z "${API_URL}" ]; then echo "Erreur: API_URL est requis"; exit 1; fi
+	
 	sam deploy --resolve-s3 --template-file .aws-sam/build/template.yaml --stack-name multi-stack-${env} \
-         --capabilities CAPABILITY_IAM --region ${AWS_REGION} --parameter-overrides EnvironmentName=${env} --no-fail-on-empty-changeset
+         --capabilities CAPABILITY_IAM --region ${AWS_REGION} \
+         --parameter-overrides \
+           EnvironmentName=${env} \
+           TelegramBotToken=${TELEGRAM_BOT_TOKEN} \
+           MistralApiKey=${MISTRAL_API_KEY} \
+         --no-fail-on-empty-changeset
 
 
 serve:
