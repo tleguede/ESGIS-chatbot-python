@@ -43,6 +43,12 @@ pipeline {
             }
         }
 
+        stage('Install SAM CLI') {
+            steps {
+                sh 'pip install aws-sam-cli'
+            }
+        }
+
         stage('Build') {
             steps {
                 script {
