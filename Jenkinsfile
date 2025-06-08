@@ -54,7 +54,7 @@ pipeline {
             steps {
                 script {
                     echo "Building the project..."
-                    sh "make build"
+                    sh 'export PATH=$PATH:~/.local/bin && make build'
                 }
             }
         }
