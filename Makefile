@@ -27,8 +27,8 @@ venv:
 	python3 -m venv venv || python -m venv venv || echo "Environnement virtuel déjà créé ou impossible à créer"
 
 # Installer les dépendances
-install: venv
-	python -m pip install -r requirements.txt
+install:
+	. venv/bin/activate && pip install -r requirements.txt || venv\Scripts\activate && pip install -r requirements.txt
 
 # Exécuter les tests
 test:
@@ -58,7 +58,7 @@ deploy:
 
 
 serve:
-	python -m uvicorn src.main:app --reload --port 3000
+	. venv/bin/activate && python -m uvicorn src.main:app --reload --port 3000 || venv\Scripts\activate && python -m uvicorn src.main:app --reload --port 3000
 
 test-endpoint:
 	@echo "Running endpoint tests..."
