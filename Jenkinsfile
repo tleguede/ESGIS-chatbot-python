@@ -96,7 +96,7 @@ pipeline {
                         sh """
                             # Activate virtual environment and run the script
                             . .venv/bin/activate
-                            python tools/set_webhook.py --url "${apiUrl}/telegram/webhook"
+                            python ./set_webhook.py --url "${apiUrl}/api/chat/update"
                             deactivate
                         """
                     }
