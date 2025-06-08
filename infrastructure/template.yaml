@@ -77,6 +77,9 @@ Resources:
       CodeUri: ../
       Handler: src/app.lambda_handler
       Runtime: python3.12
+      # Augmenter le timeout et la mémoire pour éviter les timeouts
+      Timeout: 30
+      MemorySize: 256
       Environment:
         Variables:
           ENV_NAME: !Ref EnvironmentName
