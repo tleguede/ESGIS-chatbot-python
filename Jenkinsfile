@@ -17,78 +17,21 @@ pipeline {
         stage('Initialisation') {
             steps {
                 script {
-                    node {
-                        sh "echo Branch name ${BRANCH_NAME}"
-                        sh "make venv && make install"
-                    }
+                    sh "echo Branch name ${BRANCH_NAME}"
+                    sh "make venv && make install"
                 }
             }
         }
 
-        stage('Environnement variable injection'){
+        stage('Environnement variable injection') {
             steps {
-                script{
-                    node {
-                        withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
-                            sh "cat ${ENV_FILE} > .env"
-                        }
+                withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
+                    script {
+                        sh "cat ${ENV_FILE} > .env"
                     }
                 }
             }
         }
-
-        // stage('Code Quality') {
-        //     parallel {
-        //         stage('Formatting') {
-        //             steps {
-        //                 sh "make format"
-        //             }
-        //         }
-        //         /* stage('Linting') {
-        //             steps {
-        //                 sh "make lint"
-        //             }
-        //         } */
-        //         /* stage('Type Checking') {
-        //             steps {
-        //                 sh "make type-check"
-        //             }
-        //         } */
-        //     }
-        //     post {
-        //         failure {
-        //             error "Code quality checks failed"
-        //         }
-        //     }
-        // }
-
-        // stage('Tests Unitaires') {
-        //     steps {
-        //         script {
-        //             // Add your test commands here
-        //             echo "Running tests..."
-        //             sh "make test"
-        //         }
-        //     }
-        //     post {
-        //         always {
-        //             junit 'test-results/*.xml'
-        //         }
-        //     }
-        // }
-
-        // stage('Security Scan') {
-        //     steps {
-        //         script {
-        //             sh ".venv/bin/bandit -r src/ -f json -o bandit-report.json"
-        //         }
-        //     }
-        //     post {
-        //         always {
-        //             archiveArtifacts artifacts: 'bandit-report.json', fingerprint: true
-        //         }
-        //     }
-        // }
 
         stage('Build') {
             steps {
@@ -147,21 +90,7 @@ pipeline {
             }
         }
 
-        // stage('Test endpoint'){
-        //     when {
-        //         anyOf {
-        //             branch 'alwil17'
-        //             branch 'preprod'
-        //         }
-        //     }
-        //     steps {
-        //         script {
-        //             // Add your endpoint testing commands here
-        //             echo "Testing the endpoint..."
-        //             sh "make test-endpoint"
-        //         }
-        //     }
-        // }
+
     }
 
     post {
