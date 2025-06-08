@@ -45,8 +45,12 @@ pipeline {
 
         stage('Install SAM CLI') {
             steps {
-                sh 'pip install --user aws-sam-cli'
-                sh '~/.local/bin/sam --version || sam --version'
+                sh '''
+                    export HOME=/tmp
+                    mkdir -p $HOME/.local
+                    pip install --user aws-sam-cli
+                    $HOME/.local/bin/sam --version || sam --version
+                '''
             }
         }
 
@@ -54,7 +58,7 @@ pipeline {
             steps {
                 script {
                     echo "Building the project..."
-                    sh 'export PATH=$PATH:~/.local/bin && make build'
+                    sh 'export HOME=/tmp && export PATH=$PATH:$HOME/.local/bin && make build'
                 }
             }
         }
