@@ -50,120 +50,77 @@ Resources:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
 
-  # Définir d'abord la fonction Lambda
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
+      FailOnWarnings: true
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - "GET"
+          - "POST"
+          - "OPTIONS"
+        AllowHeaders:
+          - "Content-Type"
+          - "X-Amz-Date"
+          - "Authorization"
+          - "X-Api-Key"
+          - "X-Amz-Security-Token"
+          - "X-Amz-User-Agent"
+
   Function:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "chatbot-lambda-${EnvironmentName}"
       CodeUri: ../
-      Handler: src/lambda.lambda_handler
-      Runtime: python3.9
-      # Augmenter le timeout et la mémoire pour éviter les timeouts
-      Timeout: 30
-      MemorySize: 256
+      Handler: src/app.lambda_handler
+      Runtime: python3.12
       Environment:
         Variables:
+          ENV_NAME: !Ref EnvironmentName
+          DYNAMO_TABLE: !Ref DynamoDBTable
           TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
           MISTRAL_API_KEY: !Ref MistralApiKey
-          DATABASE_TYPE: "dynamodb"
-          DYNAMO_TABLE: !Ref DynamoDBTable
-          ENV: !Ref EnvironmentName
-          # URL de l'API construite dynamiquement
-          API_URL: !Sub 'https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
-      # Pas d'intégration directe avec API Gateway pour éviter les dépendances circulaires
+          TELEGRAM_WEBHOOK_PATH: "/api/chat/update"
       Policies:
-        - Version: '2012-10-17'
-          Statement:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+        - Statement:
             - Effect: Allow
               Action:
-                - 'dynamodb:GetItem'
-                - 'dynamodb:DeleteItem'
-                - 'dynamodb:PutItem'
-                - 'dynamodb:Query'
-                - 'dynamodb:UpdateItem'
-                - 'dynamodb:BatchWriteItem'
-                - 'dynamodb:BatchGetItem'
-                - 'dynamodb:DescribeTable'
-                - 'dynamodb:ConditionCheckItem'
-              Resource: !GetAtt DynamoDBTable.Arn
-            - Effect: Allow
-              Action:
-                - 'dynamodb:Query'
-              Resource: !Sub '${DynamoDBTable.Arn}/index/*'
+                - dynamodb:GetItem
+                - dynamodb:DeleteItem
+                - dynamodb:PutItem
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:BatchGetItem
+                - dynamodb:DescribeTable
+                - dynamodb:ConditionCheckItem
+                - apigateway:POST
+                - apigateway:GET
+              Resource:
+                - !GetAtt DynamoDBTable.Arn
+                - !Sub "${DynamoDBTable.Arn}/index/*"
+      Events:
+        ApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /{proxy+}
+            Method: ANY
 
-  # API Gateway HTTP API
-  Api:
-    Type: AWS::ApiGatewayV2::Api
-    Properties:
-      Name: !Sub "chatbot-apigateway-${EnvironmentName}"
-      ProtocolType: HTTP
-      CorsConfiguration:
-        AllowOrigins:
-          - '*'
-        AllowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - OPTIONS
-        AllowHeaders:
-          - Content-Type
-          - Authorization
-          - X-Amz-Date
-          - X-Api-Key
-          - X-Amz-Security-Token
-      
-  # Stage pour l'API Gateway
-  ApiGatewayDefaultStage:
-    Type: AWS::ApiGatewayV2::Stage
-    Properties:
-      ApiId: !Ref Api
-      StageName: $default
-      AutoDeploy: true
-      
-  # Intégration Lambda avec API Gateway
-  ApiIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref Api
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !GetAtt Function.Arn
-      PayloadFormatVersion: '2.0'
-      
-  # Route par défaut pour l'API Gateway
-  ApiDefaultRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref Api
-      RouteKey: '$default'
-      Target: !Join
-        - /
-        - - integrations
-          - !Ref ApiIntegration
-          
-  # Permission pour que l'API Gateway puisse appeler la fonction Lambda
-  LambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref Function
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Join
-        - ''
-        - - 'arn:'
-          - !Ref 'AWS::Partition'
-          - ':execute-api:'
-          - !Ref 'AWS::Region'
-          - ':'
-          - !Ref 'AWS::AccountId'
-          - ':'
-          - !Ref Api
-          - '/*/*'
+
 
 Outputs:
-  DynamoDBTableName:
-    Value: !Ref DynamoDBTable
-    Description: Name of the DynamoDB table
   ApiUrl:
-    Description: URL of your API
-    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/"
+  WebhookUrl:
+    Description: "Telegram Webhook URL"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/api/chat/update"
+  DynamoDBTableName:
+    Description: "DynamoDB Table Name"
+    Value: !Ref DynamoDBTable

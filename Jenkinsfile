@@ -1,5 +1,5 @@
 pipeline {
-    agent any 
+    agent any
 
     options {
         ansiColor('xterm')
@@ -8,67 +8,81 @@ pipeline {
     environment {
         // Define environment variables here
         BOT_NAME = 'awesome-bot'
-        // BOT_TOKEN = credentials('telegram-bot-token')
+        TELEGRAM_BOT_TOKEN = credentials('telegram-bot-token')
+        MISTRAL_API_KEY = credentials('mistral-api-key')
+        PYTHON_VERSION = '3.12'
     }
 
     stages {
-
         stage('Initialisation') {
             steps {
                 sh "echo Branch name ${BRANCH_NAME}"
-                
-                // Vérifier l'installation de Python
-                sh '''
-                    echo "Vérification de l'environnement Python..."
-                    which python3 || which python || echo "Python n'est pas installé ou n'est pas dans le PATH"
-                    python3 --version || python --version || echo "Impossible d'obtenir la version de Python"
-                '''
-                
-                // Installer les dépendances directement sans utiliser l'environnement virtuel
-                sh '''
-                    echo "Installation des dépendances..."
-                    pip install -r requirements.txt || python -m pip install -r requirements.txt || python3 -m pip install -r requirements.txt
-                '''
+                sh "make venv && make install"
             }
         }
 
-        stage('Environment variable injection'){
+        stage('Environnement variable injection'){
             steps {
-                script {
-                    echo "Setting up environment variables..."
-                    
-                    // Copier le fichier .env.example vers .env
-                    sh "cp .env.example .env"
-                    
-                    // Si le credential existe, l'utiliser, sinon continuer avec les valeurs par défaut
-                    try {
-                        withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
-                            sh "cat $ENV_FILE > .env"
-                            echo "Using credentials from tleguede-chatbot-env-file"
-                        }
-                    } catch (Exception e) {
-                        echo "Warning: tleguede-chatbot-env-file not found, using .env.example values"
+                script{
+                    withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
+                        sh "cat ${ENV_FILE} > .env"
                     }
-                    
-                    // Afficher les premières lignes du fichier .env pour le débogage (sans afficher les valeurs sensibles)
-                    sh '''
-                        echo "Current .env file content (first 5 lines):"
-                        head -n 5 .env || true
-                        echo "..."
-                    '''
                 }
             }
         }
 
-        stage('Tests Unitaires') {
-            steps {
-                script {
-                    // Add your test commands here
-                    echo "Running tests..."
-                    sh "make test"
-                }
-            }
-        }
+        // stage('Code Quality') {
+        //     parallel {
+        //         stage('Formatting') {
+        //             steps {
+        //                 sh "make format"
+        //             }
+        //         }
+        //         /* stage('Linting') {
+        //             steps {
+        //                 sh "make lint"
+        //             }
+        //         } */
+        //         /* stage('Type Checking') {
+        //             steps {
+        //                 sh "make type-check"
+        //             }
+        //         } */
+        //     }
+        //     post {
+        //         failure {
+        //             error "Code quality checks failed"
+        //         }
+        //     }
+        // }
+
+        // stage('Tests Unitaires') {
+        //     steps {
+        //         script {
+        //             // Add your test commands here
+        //             echo "Running tests..."
+        //             sh "make test"
+        //         }
+        //     }
+        //     post {
+        //         always {
+        //             junit 'test-results/*.xml'
+        //         }
+        //     }
+        // }
+
+        // stage('Security Scan') {
+        //     steps {
+        //         script {
+        //             sh ".venv/bin/bandit -r src/ -f json -o bandit-report.json"
+        //         }
+        //     }
+        //     post {
+        //         always {
+        //             archiveArtifacts artifacts: 'bandit-report.json', fingerprint: true
+        //         }
+        //     }
+        // }
 
         stage('Build') {
             steps {
@@ -85,47 +99,70 @@ pipeline {
                 script {
                     // Add your deployment commands here
                     echo "Deploying the project..."
-                    
-                    // Read the .env file to get the values
-                    def envVars = readFile('.env')
-                    def telegramToken = (envVars =~ /TELEGRAM_BOT_TOKEN=["']?([^\r\n"']+)["']?/)[0][1]
-                    def mistralKey = (envVars =~ /MISTRAL_API_KEY=["']?([^\r\n"']+)["']?/)[0][1]
-                    
-                    // Deploy with the environment variables (sans API_URL qui sera récupérée après le déploiement)
-                    sh "make deploy env=${BRANCH_NAME} TELEGRAM_BOT_TOKEN='${telegramToken}' MISTRAL_API_KEY='${mistralKey}'"
-                    
-                    // Récupérer l'URL de l'API depuis les outputs CloudFormation
-                    def apiUrl = sh(script: "aws cloudformation describe-stacks --stack-name multi-stack-${BRANCH_NAME} --query \"Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue\" --output text", returnStdout: true).trim()
-                    echo "API URL récupérée: ${apiUrl}"
-                    
-                    // Mettre à jour le fichier .env avec la nouvelle URL
-                    sh "sed -i 's|API_URL=.*|API_URL=${apiUrl}|g' .env"
-                    
-                    // Sauvegarder le fichier .env mis à jour dans les credentials Jenkins
-                    withCredentials([file(credentialsId: 'tleguede-chatbot-env-file', variable: 'ENV_FILE')]) {
-                        sh "cat .env > $ENV_FILE"
-                        echo "Fichier .env mis à jour et sauvegardé dans les credentials"
+                    withCredentials([
+                        string(credentialsId: 'telegram-bot-token', variable: 'TELEGRAM_BOT_TOKEN'),
+                        string(credentialsId: 'mistral-api-key', variable: 'MISTRAL_API_KEY')
+                    ]) {
+                        sh """
+                            make deploy env=${BRANCH_NAME} \
+                            TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN} \
+                            MISTRAL_API_KEY=${MISTRAL_API_KEY}
+                        """
                     }
                 }
             }
         }
 
-        stage('Test endpoint'){
+        stage('Configure Webhook') {
             steps {
                 script {
-                    // Add your endpoint testing commands here
-                    echo "Testing the endpoint..."
-                    sh "make test-endpoint env=${BRANCH_NAME}"
+                    // Get the API URL from CloudFormation outputs
+                    def apiUrl = sh(
+                        script: """
+                            aws cloudformation describe-stacks \
+                            --stack-name multi-stack-${BRANCH_NAME} \
+                            --region eu-west-3 \
+                            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+                            --output text
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    // Configure the webhook
+                    withCredentials([string(credentialsId: 'telegram-bot-token', variable: 'TELEGRAM_BOT_TOKEN')]) {
+                        sh """
+                            # Activer l'environnement virtuel et exécuter le script
+                            . .venv/bin/activate
+                            python tools/set_webhook.py --url "${apiUrl}/telegram/webhook"
+                            deactivate
+                        """
+                    }
                 }
             }
         }
+
+        // stage('Test endpoint'){
+        //     when {
+        //         anyOf {
+        //             branch 'alwil17'
+        //             branch 'preprod'
+        //         }
+        //     }
+        //     steps {
+        //         script {
+        //             // Add your endpoint testing commands here
+        //             echo "Testing the endpoint..."
+        //             sh "make test-endpoint"
+        //         }
+        //     }
+        // }
     }
 
     post {
         always {
             script {
-                // Add your post-build actions here
-                echo "Post-build actions..."
+                // Clean workspace
+                cleanWs()
             }
         }
         success {
@@ -145,5 +182,4 @@ pipeline {
             }
         }
     }
-
 }

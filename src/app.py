@@ -9,6 +9,7 @@ import traceback
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from typing import Optional
+from mangum import Mangum
 
 from .config.env import config, validate_env
 from .config.swagger import setup_swagger
@@ -360,6 +361,8 @@ def create_app(db_adapter: Optional[DatabaseAdapter] = None) -> FastAPI:
 
 # Créer et exporter l'application FastAPI
 app = create_app()
+
+lambda_handler = Mangum(app)
 
 if __name__ == "__main__":
     import uvicorn

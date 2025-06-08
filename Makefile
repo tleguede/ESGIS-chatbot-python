@@ -3,7 +3,7 @@
 # Par défaut, nous utilisons cette région AWS
 AWS_REGION ?= eu-west-3
 AWS_PROFILE ?= "esgis_profile"
-ENV_NAME ?= "tleguede-dev"
+# ENV_NAME ?= "tleguede-dev"
 
 # Commande pour démarrer uniquement le bot Telegram
 bot:
@@ -58,7 +58,7 @@ deploy:
 
 
 serve:
-	python -m uvicorn src.main:app --reload
+	python -m uvicorn src.main:app --reload --port 3000
 
 test-endpoint:
 	@echo "Running endpoint tests..."
