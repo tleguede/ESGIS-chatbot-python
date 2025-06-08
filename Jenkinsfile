@@ -1,9 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.12'
-        }
-    }
+    agent any
 
     options {
         ansiColor('xterm')
@@ -43,22 +39,22 @@ pipeline {
             }
         }
 
-        stage('Install SAM CLI') {
-            steps {
-                sh '''
-                    export HOME=/tmp
-                    mkdir -p $HOME/.local
-                    pip install --user aws-sam-cli
-                    $HOME/.local/bin/sam --version || sam --version
-                '''
-            }
-        }
+        // stage('Install SAM CLI') {
+        //     steps {
+        //         sh '''
+        //             export HOME=/tmp
+        //             mkdir -p $HOME/.local
+        //             pip install --user aws-sam-cli
+        //             $HOME/.local/bin/sam --version || sam --version
+        //         '''
+        //     }
+        // }
 
         stage('Build') {
             steps {
                 script {
                     echo "Building the project..."
-                    sh 'export HOME=/tmp && export PATH=$PATH:$HOME/.local/bin && make build'
+                    sh 'make build'
                 }
             }
         }
