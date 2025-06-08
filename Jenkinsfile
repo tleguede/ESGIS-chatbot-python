@@ -39,17 +39,6 @@ pipeline {
             }
         }
 
-        // stage('Install SAM CLI') {
-        //     steps {
-        //         sh '''
-        //             export HOME=/tmp
-        //             mkdir -p $HOME/.local
-        //             pip install --user aws-sam-cli
-        //             $HOME/.local/bin/sam --version || sam --version
-        //         '''
-        //     }
-        // }
-
         stage('Delete Stuck Stack') {
             steps {
                 script {
@@ -57,9 +46,9 @@ pipeline {
                     sh '''
                         aws cloudformation delete-stack --stack-name multi-stack-${env.BRANCH_NAME} --region eu-west-3 || true
                         echo "Attente de la suppression du stack..."
-                        for i in {1..30}; do
-                            status=$(aws cloudformation describe-stacks --stack-name multi-stack-${env.BRANCH_NAME} --region eu-west-3 --query "Stacks[0].StackStatus" --output text 2>&1 || echo "DELETE_COMPLETE")
-                            if [ "$status" = "DELETE_COMPLETE" ] || [[ "$status" == *"ValidationError"* ]]; then
+                        for i in $(seq 1 30); do
+                            status=$(aws cloudformation describe-stacks --stack-name multi-stack-${env.BRANCH_NAME} --region eu-west-3 --query "Stacks[0].StackStatus" --output text 2>&1)
+                            if [ $? -ne 0 ] || [ "$status" = "DELETE_COMPLETE" ] || echo "$status" | grep -q "ValidationError"; then
                                 echo "Stack supprimé ou inexistant."
                                 break
                             fi
