@@ -39,33 +39,33 @@ pipeline {
             }
         }
 
-        stage('Delete Stuck Stack') {
-            steps {
-                script {
-                    def stackName = "multi-stack-${env.BRANCH_NAME}"
-                    echo "Suppression du stack bloqué CloudFormation (${stackName}) si besoin..."
-                    sh """
-                        STACKNAME='${stackName}'
-                        aws cloudformation delete-stack --stack-name $STACKNAME --region eu-west-3 || true
-                        echo "Attente de la suppression du stack..."
-                        for i in \$(seq 1 30); do
-                            status=\$(aws cloudformation describe-stacks --stack-name $STACKNAME --region eu-west-3 --query "Stacks[0].StackStatus" --output text 2>&1)
-                            if [ \$? -ne 0 ]; then
-                                echo "Stack supprimé ou inexistant."
-                                break
-                            fi
-                            echo "$status" | grep -q "ValidationError"
-                            if [ \$? -eq 0 ] || [ "$status" = "DELETE_COMPLETE" ]; then
-                                echo "Stack supprimé ou inexistant."
-                                break
-                            fi
-                            echo "Statut actuel: $status, attente..."
-                            sleep 10
-                        done
-                    """
-                }
-            }
-        }
+        // stage('Delete Stuck Stack') {
+        //     steps {
+        //         script {
+        //             def stackName = "multi-stack-${env.BRANCH_NAME}"
+        //             echo "Suppression du stack bloqué CloudFormation (${stackName}) si besoin..."
+        //             sh """
+        //                 STACKNAME='${stackName}'
+        //                 aws cloudformation delete-stack --stack-name $STACKNAME --region eu-west-3 || true
+        //                 echo "Attente de la suppression du stack..."
+        //                 for i in \$(seq 1 30); do
+        //                     status=\$(aws cloudformation describe-stacks --stack-name $STACKNAME --region eu-west-3 --query "Stacks[0].StackStatus" --output text 2>&1)
+        //                     if [ \$? -ne 0 ]; then
+        //                         echo "Stack supprimé ou inexistant."
+        //                         break
+        //                     fi
+        //                     echo "$status" | grep -q "ValidationError"
+        //                     if [ \$? -eq 0 ] || [ "$status" = "DELETE_COMPLETE" ]; then
+        //                         echo "Stack supprimé ou inexistant."
+        //                         break
+        //                     fi
+        //                     echo "Statut actuel: $status, attente..."
+        //                     sleep 10
+        //                 done
+        //             """
+        //         }
+        //     }
+        // }
 
         stage('Build') {
             steps {
